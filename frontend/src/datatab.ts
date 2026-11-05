@@ -1,0 +1,221 @@
+// The Data tab: paged, sortable, filterable, editable rows of one table,
+// or an overview when a database or connection is selected.
+import { h, clear, icon, formatCount, formatBytes } from './util';
+import { Go, forConn } from './api';
+import { Grid } from './grid';
+import { dropdown, toast, errorMessage, confirm, showError } from './dialogs';
+import { state, connInfo, quoteIdent, type Selection } from './state';
+import * as actions from './actions';
+import type { db } from '../wailsjs/go/models';
+
+const PAGE = 1000;
+
+export class DataTab {
+  el = h('div', { class: 'pane' });
+  private sel: Selection | null = null;
+  private grid: Grid | null = null;
+  private def: db.TableDef | null = null;
+  private where = '';
+  private sort: { col: string; desc: boolean } | null = null;
+  private offset = 0;
+  private total = 0;
+  private pending = h('div', { class: 'pending-bar', hidden: true });
+  private info = h('span', { class: 'pager' });
+  private whereInput = h('input', { class: 'input', style: { flex: '1', minWidth: '200px' }, placeholder: "WHERE …  e.g. email LIKE '%@example.com'", 'aria-label': 'Filter rows (WHERE clause)', spellcheck: 'false' });
+  private token = 0;
+
+  constructor() {
+    this.whereInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        this.where = this.whereInput.value;
+        this.offset = 0;
+        this.load();
+      }
+    });
+  }
+
+  get dirty() {
+    return this.grid?.dirty ?? 0;
+  }
+
+  async show(sel: Selection | null, force = false) {
+    if (!force && this.sel && sel && sameTable(this.sel, sel)) return;
+    if (this.dirty && !(await confirm('Unsaved changes', `Discard ${this.dirty} unsaved changes?`, 'Discard', true))) return;
+    this.sel = sel;
+    this.where = '';
+    this.whereInput.value = '';
+    this.sort = null;
+    this.offset = 0;
+    this.def = null;
+    if (!sel) return clear(this.el, welcome());
+    if (sel.kind === 'table' || sel.kind === 'view') return this.showTable(sel);
+    if (sel.kind === 'database') return this.showDatabase(sel);
+    if (sel.kind === 'connection') return this.showConnection(sel);
+    clear(this.el, h('div', { class: 'empty' }, 'Open the Structure tab to see this routine.'));
+  }
+
+  private async showTable(sel: Selection) {
+    const q = quoteIdent(sel.conn);
+    const isView = sel.kind === 'view';
+    this.grid = new Grid({
+      editable: !isView,
+      table: sel.table,
+      quote: q,
+      onSort: (col) => {
+        this.sort = this.sort?.col === col ? (this.sort.desc ? null : { col, desc: true }) : { col, desc: false };
+        this.offset = 0;
+        this.load();
+      },
+      onFollow: (fk, values) => actions.followForeignKey(sel, fk, values),
+      onChange: () => this.updatePending(),
+    });
+    const toolbar = h('div', { class: 'pane-toolbar' },
+      h('label', { style: { display: 'contents' } }, h('b', { style: { color: 'var(--magenta)' } }, 'WHERE'), this.whereInput),
+      h('button', { type: 'button', class: 'btn', onclick: () => { this.where = this.whereInput.value; this.offset = 0; this.load(); } }, 'Apply'),
+      this.info,
+      h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Previous page', onclick: () => this.page(-1) }, '‹'),
+      h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Next page', onclick: () => this.page(1) }, '›'),
+      dropdown('Copy as', () => [
+        { label: 'CSV', action: () => this.grid!.copyAll('csv') },
+        { label: 'JSON', action: () => this.grid!.copyAll('json') },
+        { label: 'SQL INSERT', action: () => this.grid!.copyAll('sql') },
+        { label: 'Markdown', action: () => this.grid!.copyAll('markdown') },
+      ]),
+      dropdown('Export', () => ['csv', 'json', 'sql'].map((f) => ({ label: `Whole table as ${f.toUpperCase()}`, action: () => actions.exportTable(sel, f, this.where) }))),
+      isView ? null : h('button', { type: 'button', class: 'btn', onclick: () => this.grid!.insertRow() }, icon('plus'), 'Row'),
+      h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Refresh', title: 'Refresh (F5)', onclick: () => this.load() }, icon('refresh')),
+    );
+    clear(this.el, toolbar, this.grid.el, this.pending);
+    try {
+      this.def = await forConn(sel.conn, () => Go.Describe(sel.conn, sel.db!, sel.schema ?? '', sel.table!));
+      this.grid.opt.pk = this.def.columns.length ? pkOf(this.def) : [];
+      this.grid.opt.fks = this.def.foreignKeys ?? [];
+    } catch (e) {
+      toast(errorMessage(e), 'error');
+    }
+    await this.load();
+  }
+
+  async load() {
+    const sel = this.sel;
+    if (!sel || !this.grid || !sel.table) return;
+    if (this.dirty && !(await confirm('Unsaved changes', `Discard ${this.dirty} unsaved changes?`, 'Discard', true))) return;
+    const token = ++this.token;
+    this.info.textContent = 'Loading…';
+    try {
+      const r = await forConn(sel.conn, () => Go.Browse(sel.conn, sel.db!, sel.schema ?? '', sel.table!, this.where, this.sort?.col ?? '', this.sort?.desc ?? false, this.offset, PAGE));
+      if (token !== this.token) return;
+      this.total = r.total;
+      this.grid.opt.sort = this.sort;
+      this.grid.set(r.result.columns, r.result.types, r.result.rows);
+      const n = r.result.rows?.length ?? 0;
+      this.info.textContent = n ? `Rows ${formatCount(this.offset + 1)}–${formatCount(this.offset + n)} of ${formatCount(this.total)}` : `0 of ${formatCount(this.total)} rows`;
+      this.updatePending();
+    } catch (e) {
+      if (token !== this.token) return;
+      this.info.textContent = '';
+      this.grid.set([], [], []);
+      toast(errorMessage(e), 'error');
+    }
+  }
+
+  private page(dir: number) {
+    const next = this.offset + dir * PAGE;
+    if (next < 0 || next >= this.total) return;
+    this.offset = next;
+    this.load();
+  }
+
+  /** filterBy shows rows matching column values (follow foreign key). */
+  async filterBy(where: string) {
+    this.where = where;
+    this.whereInput.value = where;
+    this.offset = 0;
+    await this.load();
+  }
+
+  private updatePending() {
+    const n = this.dirty;
+    this.pending.hidden = n === 0;
+    if (!n) return;
+    const color = connInfo(this.sel!.conn)?.color;
+    clear(this.pending, h('span', {}, `${n} pending change${n === 1 ? '' : 's'}`), h('span', { class: 'spacer' }),
+      h('button', { type: 'button', class: 'btn', onclick: () => this.grid!.discard() }, 'Discard'),
+      h('button', { type: 'button', class: 'btn primary', onclick: () => this.save(color === 'red') }, icon('save'), 'Save', h('span', { class: 'shortcut' }, 'Ctrl+S')));
+  }
+
+  /** save writes the queued changes; red (production) connections ask first. */
+  async save(confirmFirst = connInfo(this.sel?.conn ?? '')?.color === 'red') {
+    const sel = this.sel;
+    if (!sel || !this.grid || !this.dirty) return;
+    const changes = this.grid.changes();
+    if (confirmFirst && !(await confirm('Save to a red connection', `${sel.conn} is marked red. Save ${changes.length} changes to ${sel.table}?`, 'Save', true))) return;
+    try {
+      await forConn(sel.conn, () => Go.ApplyRowChanges(sel.conn, sel.db!, sel.schema ?? '', sel.table!, changes as any));
+      toast(`Saved ${changes.length} change${changes.length === 1 ? '' : 's'}`);
+      this.grid.discard();
+      await this.load();
+    } catch (e) {
+      showError(e, 'Could not save');
+    }
+  }
+
+  private async showDatabase(sel: Selection) {
+    this.grid = null;
+    const body = h('div', { class: 'grid-wrap' });
+    clear(this.el,
+      h('div', { class: 'pane-toolbar' },
+        h('b', {}, sel.db),
+        h('span', { class: 'spacer' }),
+        h('button', { type: 'button', class: 'btn', onclick: () => actions.newTable(sel) }, icon('plus'), 'Table'),
+        h('button', { type: 'button', class: 'btn', onclick: () => actions.importSQL(sel) }, 'Import SQL'),
+        h('button', { type: 'button', class: 'btn', onclick: () => actions.dump(sel) }, 'Dump'),
+        h('button', { type: 'button', class: 'btn', onclick: () => actions.cloneTo(sel) }, 'Clone to…'),
+      ),
+      body);
+    try {
+      const objs = await forConn(sel.conn, () => Go.DatabaseObjects(sel.conn, sel.db!));
+      const g = new Grid({});
+      g.set(['name', 'schema', 'type', 'rows', 'size'], ['', '', '', 'bigint', ''], (objs.tables ?? []).map((t) => [t.name, t.schema, t.type, t.rows ?? null, t.size === undefined || t.size === null ? null : formatBytes(t.size)]));
+      clear(body, g.el);
+    } catch (e) {
+      clear(body, h('div', { class: 'result-error' }, errorMessage(e)));
+    }
+  }
+
+  private showConnection(sel: Selection) {
+    this.grid = null;
+    const c = connInfo(sel.conn);
+    if (!c) return;
+    const rows: [string, string][] = [
+      ['Driver', c.driver], ['Source', c.source + (c.label ? ` (${c.label})` : '')],
+      c.driver === 'sqlite' ? ['File', c.file] : ['Server', `${c.host || '127.0.0.1'}:${c.port || ''}`],
+      ['User', c.user ?? ''], ['Default database', c.database ?? ''],
+      ['SSH tunnel', c.ssh?.host ? `${c.ssh.user ? c.ssh.user + '@' : ''}${c.ssh.host}` : 'no'],
+      ['Agents (MCP)', c.hideFromAgents ? 'hidden' : c.allowAgentWrites ? 'read and write' : 'read-only'],
+    ];
+    clear(this.el,
+      h('div', { class: 'pane-toolbar' }, h('b', {}, c.name), h('span', { class: 'spacer' }),
+        c.source === 'lerd' ? null : h('button', { type: 'button', class: 'btn', onclick: () => actions.editConnection(c.name) }, 'Edit'),
+        c.driver === 'sqlite' ? null : h('button', { type: 'button', class: 'btn', onclick: () => actions.newDatabase(c.name) }, icon('plus'), 'Database'),
+      ),
+      h('div', { class: 'structure' }, h('table', { class: 'sgrid', style: { maxWidth: '640px' } }, rows.filter((r) => r[1]).map(([k, v]) => h('tr', {}, h('th', {}, k), h('td', {}, v))))),
+    );
+  }
+}
+
+function pkOf(def: db.TableDef): string[] {
+  return def.indexes?.find((i) => i.primary)?.columns ?? [];
+}
+
+function sameTable(a: Selection, b: Selection) {
+  return a.kind === b.kind && a.conn === b.conn && a.db === b.db && a.schema === b.schema && a.table === b.table && a.routine?.name === b.routine?.name;
+}
+
+export function welcome() {
+  return h('div', { class: 'empty' },
+    h('img', { src: '/logo.svg', class: 'logo', alt: '' }),
+    h('div', {}, h('b', {}, 'dbro'), ' · your database bro'),
+    state.connections.length ? h('div', {}, 'Pick a table in the tree, or press ', h('span', { class: 'kbd' }, 'Ctrl+P'), ' to search.') : h('button', { type: 'button', class: 'btn primary', onclick: () => actions.editConnection() }, icon('plus'), 'New connection'),
+  );
+}

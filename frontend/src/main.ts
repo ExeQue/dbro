@@ -1,49 +1,247 @@
 import './style.css';
-import './app.css';
+import { EventsOn } from '../wailsjs/runtime/runtime';
+import { h, clear, icon } from './util';
+import { Go } from './api';
+import { state, on, emit, connInfo, type Selection } from './state';
+import { applyTheme, applyFont } from './theme';
+import { Tree } from './tree';
+import { DataTab, welcome } from './datatab';
+import { StructureTab } from './structure';
+import { QueryTab } from './query';
+import { dialogOpen, confirm, toast, showError } from './dialogs';
+import * as actions from './actions';
+import type { theme } from '../wailsjs/go/models';
 
-import logo from './assets/images/logo-universal.png';
-import {Greet} from '../wailsjs/go/main/App';
+type TabId = 'data' | 'structure' | string;
 
-// Setup the greet function
-window.greet = function () {
-    // Get name
-    let name = nameElement!.value;
+const tree = new Tree();
+actions.bindTree(tree);
+const data = new DataTab();
+const structure = new StructureTab();
+const queries: QueryTab[] = [];
+let queryCount = 0;
+let active: TabId = 'data';
 
-    // Check if the input is empty
-    if (name === "") return;
+const tabbar = h('div', { class: 'tabbar', role: 'tablist' });
+const breadcrumb = h('div', { class: 'breadcrumb' });
+const content = h('div', { class: 'pane' });
+const logBox = h('section', { class: 'log', 'aria-label': 'SQL log' });
+const statusLeft = h('span');
+const statusRight = h('span', { class: 'right' });
 
-    // Call App.Greet(name)
-    try {
-        Greet(name)
-            .then((result) => {
-                // Update result with data back from App.Greet()
-                resultElement!.innerText = result;
-            })
-            .catch((err) => {
-                console.error(err);
-            });
-    } catch (err) {
-        console.error(err);
-    }
-};
-
-document.querySelector('#app')!.innerHTML = `
-    <img id="logo" class="logo">
-      <div class="result" id="result">Please enter your name below 👇</div>
-      <div class="input-box" id="input">
-        <input class="input" id="name" type="text" autocomplete="off" />
-        <button class="btn" onclick="greet()">Greet</button>
-      </div>
-    </div>
-`;
-(document.getElementById('logo') as HTMLImageElement).src = logo;
-
-let nameElement = (document.getElementById("name") as HTMLInputElement);
-nameElement.focus();
-let resultElement = document.getElementById("result");
-
-declare global {
-    interface Window {
-        greet: () => void;
-    }
+function layout() {
+  const sidebar = h('div', { class: 'sidebar' }, tree.root);
+  const resizer = h('div', { class: 'resizer', role: 'separator', 'aria-orientation': 'vertical' });
+  resizer.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    resizer.classList.add('drag');
+    const move = (ev: MouseEvent) => (sidebar.style.width = Math.max(160, ev.clientX) + 'px');
+    const up = () => {
+      resizer.classList.remove('drag');
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  });
+  const toolbar = h('header', { class: 'toolbar' },
+    h('span', { class: 'brand' }, 'd', h('b', {}, 'bro')),
+    h('button', { type: 'button', class: 'btn', onclick: () => actions.editConnection() }, icon('plus'), 'New connection'),
+    h('button', { type: 'button', class: 'btn', title: 'Refresh (F5)', onclick: () => refresh() }, icon('refresh'), 'Refresh', h('span', { class: 'shortcut' }, 'F5')),
+    h('button', { type: 'button', class: 'btn', onclick: () => openQuery(state.selection) }, icon('file'), 'New query', h('span', { class: 'shortcut' }, 'Ctrl+T')),
+    h('span', { class: 'spacer' }),
+    h('button', { type: 'button', class: 'btn', onclick: () => actions.quickSearch() }, icon('search'), 'Quick search', h('span', { class: 'shortcut' }, 'Ctrl+P')),
+    h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Settings', title: 'Settings', onclick: () => actions.settings() }, icon('gear', 16)),
+  );
+  const main = h('main', { class: 'main' }, breadcrumb, tabbar, content);
+  const logToggle = h('button', { type: 'button', class: 'btn small', onclick: () => logBox.classList.toggle('collapsed') }, 'Log');
+  clear(document.getElementById('app')!,
+    toolbar,
+    h('div', { class: 'body' }, sidebar, resizer, main),
+    logBox,
+    h('footer', { class: 'statusbar' }, statusLeft, h('span', { class: 'right' }, statusRight, logToggle)));
 }
+
+function renderTabs() {
+  const sel = state.selection;
+  const tableish = sel && (sel.kind === 'table' || sel.kind === 'view');
+  const tab = (id: TabId, label: string, closable = false) => {
+    const b = h('button', { type: 'button', role: 'tab', class: 'tab' + (active === id ? ' active' : ''), 'aria-selected': String(active === id), onclick: () => showTab(id) }, label);
+    if (closable) {
+      const x = h('span', { class: 'close', role: 'button', 'aria-label': 'Close ' + label, onclick: (e: Event) => { e.stopPropagation(); closeQuery(id); } }, icon('x', 11));
+      b.append(x);
+      b.addEventListener('auxclick', (e) => e.button === 1 && closeQuery(id));
+    }
+    return b;
+  };
+  clear(tabbar,
+    tab('data', sel?.kind === 'database' ? 'Database' : sel?.kind === 'connection' ? 'Connection' : tableish ? 'Data' : 'Home'),
+    tab('structure', sel?.kind === 'routine' ? 'Source' : 'Structure'),
+    queries.map((q) => tab(q.id, q.title, true)),
+    h('button', { type: 'button', class: 'tab', 'aria-label': 'New query tab', title: 'New query (Ctrl+T)', onclick: () => openQuery(state.selection) }, icon('plus', 12)));
+  const crumbs = sel ? [sel.conn, sel.db, sel.table ?? sel.routine?.name].filter(Boolean) as string[] : [];
+  clear(breadcrumb, crumbs.flatMap((c, i) => [i ? '  ›  ' : '', i === crumbs.length - 1 ? h('b', {}, c) : c]));
+}
+
+function showTab(id: TabId) {
+  active = id;
+  const q = queries.find((x) => x.id === id);
+  if (id === 'data') clear(content, data.el);
+  else if (id === 'structure') {
+    clear(content, structure.el);
+    structure.show(state.selection);
+  } else if (q) {
+    clear(content, q.el);
+    q.useSelection(state.selection);
+    setTimeout(() => q.focus(), 0);
+  }
+  renderTabs();
+}
+
+export function openQuery(sel: Selection | null, text = '') {
+  const q = new QueryTab(++queryCount, sel, text);
+  queries.push(q);
+  showTab(q.id);
+}
+
+async function closeQuery(id: TabId) {
+  const i = queries.findIndex((q) => q.id === id);
+  if (i < 0) return;
+  queries[i].dispose();
+  queries.splice(i, 1);
+  if (active === id) showTab(queries[i - 1]?.id ?? queries[i]?.id ?? 'data');
+  else renderTabs();
+}
+
+export function revealTable(sel: Selection) {
+  tree.reveal(sel).then(() => showTab('structure'));
+}
+
+async function refresh() {
+  await tree.refresh();
+  if (active === 'data') data.show(state.selection, true);
+  if (active === 'structure') structure.show(state.selection, true);
+}
+
+function updateStatus() {
+  const sel = state.selection;
+  const c = sel ? connInfo(sel.conn) : undefined;
+  statusLeft.textContent = c ? `${c.name} · ${c.driver}${c.driver === 'sqlite' ? ' · ' + c.file : ` · ${c.host || '127.0.0.1'}${c.port ? ':' + c.port : ''}`}${c.ssh?.host ? ' via ' + c.ssh.host : ''}` : 'No connection selected';
+  statusRight.textContent = `MCP: ${c?.hideFromAgents ? 'hidden' : c?.allowAgentWrites ? 'read/write' : 'read-only'} · ${state.boot?.theme?.name ?? ''}`;
+}
+
+// ---- log ----
+
+interface LogEntry { time: string; source: string; conn: string; database?: string; sql: string; durationMs: number; rows: number; error?: string }
+function addLog(e: LogEntry) {
+  const t = new Date(e.time);
+  const line = h('div', { class: 'log-line' + (e.error ? ' error' : ''), title: e.error ? e.sql + '\n\n' + e.error : e.sql },
+    h('span', { class: 'time' }, t.toLocaleTimeString('en-GB')),
+    h('span', { class: 'src ' + e.source }, `[${e.source}]`),
+    h('span', { class: 'muted' }, e.conn),
+    h('span', { class: 'sql' }, e.sql.replace(/\s+/g, ' ') + (e.error ? '  -- ' + e.error : '')),
+    h('span', { class: 'dur' }, `${e.durationMs.toFixed(1)} ms${e.rows ? ' · ' + e.rows + ' rows' : ''}`));
+  const stick = logBox.scrollTop + logBox.clientHeight >= logBox.scrollHeight - 4;
+  logBox.append(line);
+  while (logBox.childElementCount > 500) logBox.firstElementChild!.remove();
+  if (stick) logBox.scrollTop = logBox.scrollHeight;
+}
+
+// ---- events ----
+
+on('select', (sel: Selection) => {
+  if (active === 'data' || (active === 'structure' && sel.kind === 'routine')) data.show(sel);
+  if (sel.kind === 'routine' && active === 'data') showTab('structure');
+  if (active === 'structure') structure.show(sel);
+  queries.find((q) => q.id === active)?.useSelection(sel);
+  if (active !== 'data' && active !== 'structure') data.show(sel);
+  renderTabs();
+  updateStatus();
+});
+on('showTab', (id: TabId) => showTab(id));
+on('newQuery', (sel: Selection) => openQuery(sel));
+on('newTable', (sel: Selection) => {
+  showTab('structure');
+  structure.newTable(sel);
+});
+on('filterData', (where: string) => {
+  showTab('data');
+  data.filterBy(where);
+});
+on('reloadData', () => data.load());
+on('schemaChanged', () => {
+  if (state.selection?.table) data.show(state.selection, true);
+});
+on('themeChanged', (t: theme.Theme) => {
+  state.boot.theme = t;
+  updateStatus();
+});
+
+document.addEventListener('keydown', async (e) => {
+  if (dialogOpen()) return;
+  const k = (e.ctrlKey || e.metaKey ? 'Ctrl+' : '') + (e.shiftKey ? 'Shift+' : '') + e.key.toLowerCase();
+  switch (k) {
+    case 'f5':
+    case 'Ctrl+r':
+      e.preventDefault();
+      return refresh();
+    case 'Ctrl+t':
+      e.preventDefault();
+      return openQuery(state.selection);
+    case 'Ctrl+p':
+      e.preventDefault();
+      return actions.quickSearch();
+    case 'Ctrl+w':
+      if (queries.some((q) => q.id === active)) {
+        e.preventDefault();
+        closeQuery(active);
+      }
+      return;
+    case 'Ctrl+s':
+      e.preventDefault();
+      if (active === 'data') return data.save();
+      if (active === 'structure') return structure.save();
+      return;
+    case 'Ctrl+,':
+      e.preventDefault();
+      return actions.settings();
+    case 'Ctrl+n':
+      e.preventDefault();
+      return actions.editConnection();
+  }
+});
+
+window.addEventListener('beforeunload', (e) => {
+  if (data.dirty) e.preventDefault();
+});
+
+async function start() {
+  layout();
+  try {
+    state.boot = await Go.GetBootstrap();
+  } catch (e) {
+    showError(e, 'Could not load settings');
+    return;
+  }
+  applyTheme(state.boot.theme);
+  applyFont(state.boot.settings.font ?? '');
+  EventsOn('theme', (t: theme.Theme) => {
+    applyTheme(t);
+    state.boot.theme = t;
+    updateStatus();
+  });
+  EventsOn('log', addLog);
+  EventsOn('progress', (p: { task: string; text: string }) => {
+    if (p.text) statusLeft.textContent = p.text;
+    else updateStatus();
+  });
+  await tree.reload();
+  clear(data.el, welcome());
+  showTab('data');
+  updateStatus();
+  if (state.boot.askOmarchy) actions.askOmarchy();
+}
+
+start();
+
+export { emit, confirm, toast };
