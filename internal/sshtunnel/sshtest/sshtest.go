@@ -74,4 +74,3 @@ func Server(t *testing.T, password string, clientKey ssh.PublicKey) int {
 	}()
 	return ln.Addr().(*net.TCPAddr).Port
 }
-
