@@ -70,13 +70,19 @@ func (m *Manager) Connections() ([]config.Connection, []string) {
 		out = append(out, c)
 	}
 	if s, _ := config.LoadSettings(); s.Lerd {
+		projects, err := sources.LerdProjects()
+		if err != nil {
+			warn = append(warn, "lerd sites: "+err.Error())
+		}
+		out = append(out, projects...)
 		lerd, err := sources.LerdConnections()
 		if err != nil {
 			warn = append(warn, "lerd: "+err.Error())
 		}
 		out = append(out, lerd...)
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Source == "manual" && out[j].Source == "lerd" })
+	rank := map[string]int{"manual": 0, "laravel": 0, "lerd-project": 1, "lerd": 2}
+	sort.SliceStable(out, func(i, j int) bool { return rank[out[i].Source] < rank[out[j].Source] })
 	return out, warn
 }
 

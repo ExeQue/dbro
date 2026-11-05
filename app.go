@@ -223,8 +223,8 @@ func (a *App) SaveConnection(c config.Connection, oldName, password string, clea
 	if c.Name == "" {
 		return errors.New("name is required")
 	}
-	if strings.HasPrefix(c.Name, "lerd · ") {
-		return errors.New("names starting with \"lerd · \" are reserved for lerd")
+	if strings.HasPrefix(c.Name, "lerd · ") || strings.HasPrefix(c.Name, sources.LerdProjectPrefix) {
+		return errors.New("names starting with \"lerd\" and a dot are reserved for lerd")
 	}
 	saved, err := config.LoadConnections()
 	if err != nil {

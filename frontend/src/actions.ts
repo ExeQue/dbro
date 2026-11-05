@@ -16,7 +16,7 @@ export function bindTree(t: Tree) {
 
 export function connectionMenu(name: string, t: Tree): MenuItem[] {
   const c = connInfo(name);
-  const manual = c?.source !== 'lerd';
+  const manual = c?.source !== 'lerd' && c?.source !== 'lerd-project';
   return [
     state.open[name] ? { label: 'Disconnect', action: () => disconnect(name) } : { label: 'Connect', action: () => t.toggleConn(name, true) },
     { label: 'Refresh', shortcut: 'F5', action: () => t.refresh({ kind: 'connection', conn: name }) },

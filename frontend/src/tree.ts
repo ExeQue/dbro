@@ -163,7 +163,8 @@ export class Tree {
     const rows: HTMLElement[] = [];
     let lastSource = '';
     for (const c of state.connections) {
-      if (c.source === 'lerd' && lastSource !== 'lerd') rows.push(h('div', { class: 'node group', style: { paddingLeft: '8px', marginTop: '6px' } }, h('span', { class: 'label' }, 'lerd')));
+      const heading = c.source === 'lerd' ? 'lerd services' : c.source === 'lerd-project' ? 'lerd projects' : '';
+      if (heading && lastSource !== c.source) rows.push(h('div', { class: 'node group', style: { paddingLeft: '8px', marginTop: '6px' } }, h('span', { class: 'label' }, heading)));
       lastSource = c.source;
       const n = this.conn(c.name);
       const sel: Selection = { kind: 'connection', conn: c.name };
@@ -171,7 +172,7 @@ export class Tree {
         caret: n.loading ? 'spin' : n.expanded ? 'open' : 'closed',
         cls: 'conn' + (state.open[c.name] ? '' : ' closed'),
         lead: h('span', { class: 'dot', style: { background: colors[c.color] ?? 'var(--dark-foreground)' }, 'aria-hidden': 'true' }),
-        label: c.source === 'lerd' ? c.name.replace(/^lerd · /, '') : c.name,
+        label: c.source === 'lerd' ? c.name.replace(/^lerd · /, '') : c.source === 'lerd-project' ? c.name.replace(/^lerd project · /, '') : c.name,
         meta: c.missing ? 'missing' : c.label || c.driver,
         onToggle: () => this.toggleConn(c.name),
         onSelect: () => this.select(sel, c.name),

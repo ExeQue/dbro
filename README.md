@@ -5,7 +5,7 @@
 ## Features
 
 - **Connections** to servers, SQLite files and Laravel projects (read from `.env` on every connect), with SSL/TLS and SSH tunnels (`~/.ssh/config`, ssh-agent, `ProxyJump`, `known_hosts`). Passwords live in the system keyring, never on disk.
-- **lerd** database services show up by themselves, each database labeled with the lerd site that uses it.
+- **lerd**: every lerd project shows up with its own database, found the way lerd does it, from the project's framework definition (Laravel, Symfony, WordPress, Drupal, Craft and the rest lerd knows, including git worktrees). lerd's MySQL and PostgreSQL services are listed too and connect on startup.
 - **Data grid** with paging, sorting, a WHERE filter, inline editing with a change queue, NULL handling, a side editor for JSON and long text, foreign-key following, and copy as CSV, TSV, JSON, SQL or Markdown.
 - **Schema editor**: create, rename, truncate and drop databases and tables; add, change, move and drop columns, indexes and foreign keys, always with a SQL preview first. SQLite tables are rebuilt where `ALTER TABLE` falls short.
 - **Query tabs** with CodeMirror, autocomplete for tables and columns, several result sets, EXPLAIN, a per-connection history and saved snippets.

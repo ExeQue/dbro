@@ -197,7 +197,7 @@ export class DataTab {
     ];
     clear(this.el,
       h('div', { class: 'pane-toolbar' }, h('b', {}, c.name), h('span', { class: 'spacer' }),
-        c.source === 'lerd' ? null : h('button', { type: 'button', class: 'btn', onclick: () => actions.editConnection(c.name) }, 'Edit'),
+        c.source === 'lerd' || c.source === 'lerd-project' ? null : h('button', { type: 'button', class: 'btn', onclick: () => actions.editConnection(c.name) }, 'Edit'),
         c.driver === 'sqlite' ? null : h('button', { type: 'button', class: 'btn', onclick: () => actions.newDatabase(c.name) }, icon('plus'), 'Database'),
       ),
       h('div', { class: 'structure' }, h('table', { class: 'sgrid', style: { maxWidth: '640px' } }, rows.filter((r) => r[1]).map(([k, v]) => h('tr', {}, h('th', {}, k), h('td', {}, v))))),
