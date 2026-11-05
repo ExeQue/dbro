@@ -52,6 +52,7 @@ a { color: var(--accent); }
 .toolbar { display: flex; flex-wrap: nowrap; overflow: hidden; align-items: center; gap: 6px; padding: 6px 10px; background: var(--dark-background); border-bottom: 1px solid var(--border); }
 .brand { font-weight: 700; margin-right: 10px; display: flex; align-items: center; gap: 1px; }
 .brand b { color: var(--accent); }
+.brand-logo { margin-right: 6px; }
 .spacer { flex: 1; }
 .body { flex: 1; min-height: 0; display: flex; }
 .sidebar { width: clamp(150px, 26vw, 320px); min-width: 120px; max-width: 60vw; flex: none; display: flex; flex-direction: column; background: var(--dark-background); border-right: 1px solid var(--border); }

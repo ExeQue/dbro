@@ -6,6 +6,7 @@ import { Grid } from './grid';
 import { dropdown, toast, errorMessage, confirm, showError } from './dialogs';
 import { state, connInfo, quoteIdent, type Selection } from './state';
 import * as actions from './actions';
+import { logo } from './logo';
 import type { db } from '../wailsjs/go/models';
 
 const PAGE = 1000;
@@ -214,7 +215,7 @@ function sameTable(a: Selection, b: Selection) {
 
 export function welcome() {
   return h('div', { class: 'empty' },
-    h('img', { src: '/logo.svg', class: 'logo', alt: '' }),
+    logo(),
     h('div', {}, h('b', {}, 'dbro'), ' · your database bro'),
     state.connections.length ? h('div', {}, 'Pick a table in the tree, or press ', h('span', { class: 'kbd' }, 'Ctrl+P'), ' to search.') : h('button', { type: 'button', class: 'btn primary', onclick: () => actions.editConnection() }, icon('plus'), 'New connection'),
   );

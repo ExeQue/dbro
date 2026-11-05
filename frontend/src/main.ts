@@ -10,6 +10,7 @@ import { StructureTab } from './structure';
 import { QueryTab } from './query';
 import { dialogOpen, confirm, toast, showError } from './dialogs';
 import * as actions from './actions';
+import { logo } from './logo';
 import type { theme } from '../wailsjs/go/models';
 
 type TabId = 'data' | 'structure' | string;
@@ -45,7 +46,7 @@ function layout() {
     document.addEventListener('mouseup', up);
   });
   const toolbar = h('header', { class: 'toolbar' },
-    h('span', { class: 'brand' }, 'd', h('b', {}, 'bro')),
+    h('span', { class: 'brand' }, logo(20, 'brand-logo'), 'd', h('b', {}, 'bro')),
     h('button', { type: 'button', class: 'btn', title: 'New connection (Ctrl+N)', 'aria-label': 'New connection', onclick: () => actions.editConnection() }, icon('plus'), h('span', { class: 'lbl' }, 'New connection')),
     h('button', { type: 'button', class: 'btn', title: 'Refresh (F5)', 'aria-label': 'Refresh', onclick: () => refresh() }, icon('refresh'), h('span', { class: 'lbl' }, 'Refresh'), h('span', { class: 'shortcut' }, 'F5')),
     h('button', { type: 'button', class: 'btn', title: 'New query (Ctrl+T)', 'aria-label': 'New query', onclick: () => openQuery(state.selection) }, icon('file'), h('span', { class: 'lbl' }, 'New query'), h('span', { class: 'shortcut' }, 'Ctrl+T')),

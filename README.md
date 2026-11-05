@@ -22,6 +22,18 @@ go install github.com/wailsapp/wails/v2/cmd/wails@latest
 make install        # builds and installs to ~/.local (binary, .desktop file, icon)
 ```
 
+## Themes
+
+A theme is an Omarchy `colors.toml`: `mode`, `accent`, `background`, `foreground`, `selection`, the ANSI colors and so on. Missing keys come from dbro Dark or dbro Light. The logo follows `accent`; a theme can recolor it with optional keys:
+
+```toml
+logo_body = "#a3be8c"   # the cylinder
+logo_lid = "#c8dcb4"    # its top
+logo_band = "#6f8a5a"   # the disk band and rim
+logo_glint = "#ebcb8b"  # the sunglasses' glints
+logo_ink = "#20242c"    # sunglasses and smile
+```
+
 ## MCP for agents
 
 ```sh

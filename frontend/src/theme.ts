@@ -3,9 +3,14 @@ import type { theme } from '../wailsjs/go/models';
 
 let current: theme.Theme | null = null;
 
+let applied: string[] = [];
+
 export function applyTheme(t: theme.Theme) {
   current = t;
   const root = document.documentElement;
+  // drop keys the previous theme set (e.g. logo_* overrides) so defaults return
+  for (const k of applied) root.style.removeProperty(k);
+  applied = Object.keys(t.colors).filter((k) => k !== 'mode').map((k) => '--' + k.replace(/_/g, '-'));
   for (const [k, v] of Object.entries(t.colors)) {
     if (k !== 'mode') root.style.setProperty('--' + k.replace(/_/g, '-'), v);
   }
