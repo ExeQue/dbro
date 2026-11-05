@@ -17,6 +17,7 @@ import (
 	"github.com/ExeQue/dbro/internal/db"
 	"github.com/ExeQue/dbro/internal/history"
 	"github.com/ExeQue/dbro/internal/manager"
+	"github.com/ExeQue/dbro/internal/portal"
 	"github.com/ExeQue/dbro/internal/secrets"
 	"github.com/ExeQue/dbro/internal/sources"
 	"github.com/ExeQue/dbro/internal/sqllog"
@@ -590,7 +591,7 @@ func (a *App) ExportTable(name, database, schema, table, where, format string) (
 	if err != nil {
 		return "", err
 	}
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{Title: "Export " + table, DefaultFilename: table + "." + format, Filters: filters(format)})
+	path, err := a.saveDialog(runtime.SaveDialogOptions{Title: "Export " + table, DefaultFilename: table + "." + format, Filters: filters(format)})
 	if err != nil || path == "" {
 		return "", err
 	}
@@ -607,7 +608,7 @@ func (a *App) ExportRows(name string, columns []string, rows [][]any, format, ta
 	if err != nil {
 		return "", err
 	}
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{Title: "Export result", DefaultFilename: "result." + format, Filters: filters(format)})
+	path, err := a.saveDialog(runtime.SaveDialogOptions{Title: "Export result", DefaultFilename: "result." + format, Filters: filters(format)})
 	if err != nil || path == "" {
 		return "", err
 	}
@@ -623,7 +624,7 @@ func (a *App) DumpDatabase(name, database string, withData bool) (string, error)
 	if err != nil {
 		return "", err
 	}
-	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{Title: "Dump " + database, DefaultFilename: database + ".sql", Filters: filters("sql")})
+	path, err := a.saveDialog(runtime.SaveDialogOptions{Title: "Dump " + database, DefaultFilename: database + ".sql", Filters: filters("sql")})
 	if err != nil || path == "" {
 		return "", err
 	}
@@ -641,7 +642,7 @@ func (a *App) ImportSQL(name, database string, continueOnError bool) (string, er
 	if err != nil {
 		return "", err
 	}
-	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{Title: "Import SQL file", Filters: filters("sql")})
+	path, err := a.openDialog(false, runtime.OpenDialogOptions{Title: "Import SQL file", Filters: filters("sql")})
 	if err != nil || path == "" {
 		return "", err
 	}
@@ -666,7 +667,7 @@ type CSVFile struct {
 
 // PickCSV asks for a CSV file and previews it.
 func (a *App) PickCSV(delimiter string, header bool) (CSVFile, error) {
-	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{Title: "Import CSV file", Filters: []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv;*.tsv;*.txt"}}})
+	path, err := a.openDialog(false, runtime.OpenDialogOptions{Title: "Import CSV file", Filters: []runtime.FileFilter{{DisplayName: "CSV", Pattern: "*.csv;*.tsv;*.txt"}}})
 	if err != nil || path == "" {
 		return CSVFile{}, err
 	}
@@ -729,12 +730,12 @@ func (a *App) PickFile(title, kind string) (string, error) {
 	if kind == "sqlite" {
 		opts.Filters = []runtime.FileFilter{{DisplayName: "SQLite", Pattern: "*.sqlite;*.sqlite3;*.db;*.db3"}, {DisplayName: "All files", Pattern: "*"}}
 	}
-	return runtime.OpenFileDialog(a.ctx, opts)
+	return a.openDialog(false, opts)
 }
 
 // PickNewFile asks for a new file path (to create a SQLite database).
 func (a *App) PickNewFile(title string) (string, error) {
-	p, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{Title: title, DefaultFilename: "database.sqlite"})
+	p, err := a.saveDialog(runtime.SaveDialogOptions{Title: title, DefaultFilename: "database.sqlite"})
 	if err != nil || p == "" {
 		return p, err
 	}
@@ -748,10 +749,39 @@ func (a *App) PickNewFile(title string) (string, error) {
 
 // PickDirectory asks for a directory (a Laravel project).
 func (a *App) PickDirectory(title string) (string, error) {
-	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: title})
+	return a.openDialog(true, runtime.OpenDialogOptions{Title: title})
 }
 
 // CopyText puts text on the clipboard.
 func (a *App) CopyText(text string) error {
 	return runtime.ClipboardSetText(a.ctx, text)
+}
+
+func portalFilters(fs []runtime.FileFilter) []portal.Filter {
+	out := make([]portal.Filter, 0, len(fs))
+	for _, f := range fs {
+		out = append(out, portal.Filter{Name: f.DisplayName, Patterns: strings.Split(f.Pattern, ";")})
+	}
+	return out
+}
+
+// openDialog uses the desktop's file chooser portal, falling back to Wails' GTK dialog.
+func (a *App) openDialog(dir bool, o runtime.OpenDialogOptions) (string, error) {
+	p, err := portal.OpenFile(o.Title, portalFilters(o.Filters), dir)
+	if !errors.Is(err, portal.ErrUnavailable) {
+		return p, err
+	}
+	if dir {
+		return runtime.OpenDirectoryDialog(a.ctx, o)
+	}
+	return runtime.OpenFileDialog(a.ctx, o)
+}
+
+// saveDialog uses the desktop's file chooser portal, falling back to Wails' GTK dialog.
+func (a *App) saveDialog(o runtime.SaveDialogOptions) (string, error) {
+	p, err := portal.SaveFile(o.Title, o.DefaultFilename, portalFilters(o.Filters))
+	if !errors.Is(err, portal.ErrUnavailable) {
+		return p, err
+	}
+	return runtime.SaveFileDialog(a.ctx, o)
 }
