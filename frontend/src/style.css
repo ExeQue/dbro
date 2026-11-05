@@ -298,3 +298,6 @@ table.grid td.editing input.invalid { outline-color: var(--red); }
 .param code { color: var(--yellow); }
 .param .input { width: 170px; min-height: 26px; }
 .btn.on { background: var(--selection); border-color: var(--accent); }
+.param.unused code { color: var(--dark-foreground); }
+.param .param-type { width: 92px; }
+.param .input.invalid { border-color: var(--red); }

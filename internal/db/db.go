@@ -473,9 +473,11 @@ func (c *Conn) QueryParams(ctx context.Context, database, sessionID, script stri
 			return out, err
 		}
 		if c.Kind() == "postgres" && len(args) > 0 {
-			// untyped parameters ("SELECT :x IS NULL") would fail type inference in the extended
-			// protocol; pgx's simple protocol sends them as safely quoted literals instead
-			args = append([]any{pgx.QueryExecModeSimpleProtocol}, args...)
+			// Untyped parameters ("SELECT :x IS NULL") fail type inference in the extended
+			// protocol, and pgx's simple protocol quotes numbers ('1.25' * 2 is then an integer
+			// error). Inline typed literals instead: numbers bare, booleans TRUE/FALSE, strings
+			// quoted with '' escaping (standard_conforming_strings is on by default since 9.1).
+			bound, args = c.interpolate(bound, args), nil
 		}
 		r, err := c.run(ctx, s, database, bound, limit, args...)
 		if err != nil {

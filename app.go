@@ -488,6 +488,12 @@ func (a *App) RunQuery(name, database, tabID, script string, limit int, params m
 		a.mu.Unlock()
 	}()
 	history.Add(name, database, script)
+	for k, v := range params {
+		// JSON numbers arrive as float64; whole numbers bind as integers
+		if f, ok := v.(float64); ok && f == float64(int64(f)) {
+			params[k] = int64(f)
+		}
+	}
 	rs, err := c.QueryParams(ctx, database, tabID, script, limit, params)
 	run := QueryRun{Results: rs}
 	if run.Results == nil {

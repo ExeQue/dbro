@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -59,4 +60,34 @@ func TestPostgresParams(t *testing.T) {
 	if rs[0].SQL != "SELECT '41'::int + 1, 'o''hara', NULL IS NULL, 'pos', 5 > '3'" {
 		t.Fatalf("logged %q", rs[0].SQL)
 	}
+}
+
+func TestTypedParams(t *testing.T) {
+	for _, tc := range []struct {
+		driver string
+		port   int
+		user   string
+		sql    string
+	}{
+		{"mysql", 3307, "root", "SELECT :i + 1, :d * 2, :b IS TRUE, :s"},
+		{"postgres", 5432, "postgres", "SELECT :i + 1, :d * 2, :b IS TRUE, :s"},
+	} {
+		t.Run(tc.driver, func(t *testing.T) {
+			c, name := lerdConn(t, tc.driver, tc.port, tc.user)
+			rs, err := c.QueryParams(context.Background(), name, "t", tc.sql, 0, map[string]any{"i": int64(41), "d": 1.25, "b": true, "s": "0042"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			row := rs[0].Rows[0]
+			if fmt.Sprint(row[0]) != "42" || !sameNumber(row[1], 2.5) || !truthy(row[2]) || row[3] != "0042" {
+				t.Fatalf("%v (%T %T %T)", row, row[0], row[1], row[2])
+			}
+		})
+	}
+}
+
+func sameNumber(v any, want float64) bool {
+	var f float64
+	_, err := fmt.Sscan(fmt.Sprint(v), &f)
+	return err == nil && f == want
 }

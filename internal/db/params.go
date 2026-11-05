@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/jackc/pgx/v5"
 )
 
 // walkParams calls visit for every placeholder outside strings, quoted names, comments and
@@ -148,11 +146,6 @@ func (c *Conn) Bind(stmt string, values map[string]any) (string, []any, error) {
 
 // interpolate shows a statement with its arguments filled in, for the SQL log only.
 func (c *Conn) interpolate(stmt string, args []any) string {
-	if len(args) > 0 {
-		if _, ok := args[0].(pgx.QueryExecMode); ok {
-			args = args[1:]
-		}
-	}
 	if len(args) == 0 {
 		return stmt
 	}

@@ -34,8 +34,10 @@ export class QueryTab {
   private running = false;
   private grids: Grid[] = [];
   private params = h('div', { class: 'params', hidden: true });
-  private names: string[] = [];
+  private names: string[] = []; // parameters the query uses
+  private extra: string[] = []; // parameters added by hand, used or not
   private values = new Map<string, string | null>();
+  private types = new Map<string, ParamType>();
   private bind = h('input', { type: 'checkbox', checked: true, 'aria-label': 'Bind parameters' });
 
   constructor(n: number, sel: Selection | null, text = "") {
@@ -70,6 +72,7 @@ export class QueryTab {
         h('button', { type: 'button', class: 'btn', onclick: () => this.explain() }, 'Explain'),
         h('button', { type: 'button', class: 'btn', title: 'Prettify (Ctrl+Shift+F)', onclick: () => this.reformat(false) }, 'Prettify'),
         h('button', { type: 'button', class: 'btn', title: 'Minify', onclick: () => this.reformat(true) }, 'Minify'),
+        h('button', { type: 'button', class: 'btn', title: 'Add a :parameter before using it', onclick: () => this.addParam() }, icon('plus', 12), 'Parameter'),
         h('button', { type: 'button', class: 'btn', onclick: () => this.showHistory() }, icon('history', 12), 'History'),
         dropdown('Snippets', () => this.snippetMenu()),
         h('span', { class: 'spacer' }), this.target),
@@ -120,7 +123,7 @@ export class QueryTab {
       if (!m) return null;
       const from = m.from + m.text.indexOf(':');
       const typed = ctx.state.sliceDoc(from + 1, ctx.pos);
-      const used = this.names.filter((n) => !/^\d+$/.test(n) && n !== typed);
+      const used = this.allParams().filter((n) => !/^\d+$/.test(n) && n !== typed);
       const options = [
         ...used.map((n) => ({ label: ':' + n, type: 'variable', detail: 'parameter', boost: 2 })),
         ...this.columns.filter((c) => !used.includes(c)).map((c) => ({ label: ':' + c, type: 'property', detail: 'column' })),
@@ -138,32 +141,79 @@ export class QueryTab {
     this.renderParams();
   }, 300);
 
+  /** allParams lists the query's parameters followed by hand-added ones it does not use yet. */
+  private allParams(): string[] {
+    return [...this.names, ...this.extra.filter((n) => !this.names.includes(n))];
+  }
+
+  private async addParam() {
+    const name = (await prompt('New parameter', 'Name (use it as :name in the query)'))?.trim().replace(/^:/, '');
+    if (!name) return;
+    if (!/^[A-Za-z_]\w*$/.test(name)) return toast('A parameter name is letters, digits and _', 'error');
+    if (!this.extra.includes(name)) this.extra.push(name);
+    if (!this.values.has(name)) this.values.set(name, '');
+    this.bind.checked = true;
+    this.renderParams();
+    (this.params.querySelector(`input[data-param="${name}"]`) as HTMLInputElement | null)?.focus();
+  }
+
   private renderParams() {
-    this.params.hidden = this.names.length === 0;
-    if (!this.names.length) return;
+    const all = this.allParams();
+    this.params.hidden = all.length === 0;
+    if (!all.length) return;
     clear(this.params,
       h('label', { class: 'check params-toggle', title: 'Send the values as prepared statement parameters' }, this.bind, ' Parameters'),
-      this.bind.checked ? this.names.map((n) => {
+      this.bind.checked ? all.map((n) => {
         const label = /^\d+$/.test(n) ? '?' + n : ':' + n;
+        const used = this.names.includes(n);
         const v = this.values.get(n);
-        const input = h('input', { class: 'input', value: v ?? '', placeholder: v === null ? 'NULL' : '', 'aria-label': 'Value for ' + label, spellcheck: 'false', disabled: v === null });
-        input.addEventListener('input', () => this.values.set(n, input.value));
-        input.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) this.run();
+        const type = this.types.get(n) ?? 'auto';
+        const typeSel = h('select', { class: 'input param-type', 'aria-label': 'Type of ' + label, title: 'How the value is sent' },
+          (['auto', 'text', 'integer', 'decimal', 'boolean'] as ParamType[]).map((t) => h('option', { value: t, selected: t === type }, t[0].toUpperCase() + t.slice(1))));
+        typeSel.addEventListener('change', () => {
+          this.types.set(n, typeSel.value as ParamType);
+          if (typeSel.value === 'boolean' && !['true', 'false'].includes(this.values.get(n) ?? '')) this.values.set(n, 'true');
+          this.renderParams();
+        });
+        const input: HTMLInputElement | HTMLSelectElement = type === 'boolean' && v !== null
+          ? h('select', { class: 'input', 'aria-label': 'Value for ' + label, 'data-param': n }, ['true', 'false'].map((b) => h('option', { value: b, selected: v === b }, b)))
+          : h('input', { class: 'input', value: v ?? '', placeholder: v === null ? 'NULL' : '', 'aria-label': 'Value for ' + label, spellcheck: 'false', disabled: v === null, 'data-param': n, inputmode: type === 'integer' || type === 'decimal' ? 'decimal' : undefined });
+        const check = () => input.classList.toggle('invalid', typed(input.value, type) === undefined && v !== null);
+        input.addEventListener('input', () => { this.values.set(n, input.value); check(); });
+        input.addEventListener('change', () => this.values.set(n, input.value));
+        check();
+        input.addEventListener('keydown', (e: Event) => {
+          const k = e as KeyboardEvent;
+          if (k.key === 'Enter' && (k.ctrlKey || k.metaKey)) this.run();
         });
         const nul = h('button', { type: 'button', class: 'btn small' + (v === null ? ' on' : ''), 'aria-pressed': String(v === null), title: 'Bind NULL', onclick: () => {
           this.values.set(n, this.values.get(n) === null ? '' : null);
           this.renderParams();
         } }, 'NULL');
-        return h('div', { class: 'param' }, h('code', {}, label), input, nul);
+        const remove = used ? null : h('button', { type: 'button', class: 'btn icon small', 'aria-label': 'Remove ' + label, title: 'Not used in the query yet', onclick: () => {
+          this.extra = this.extra.filter((x) => x !== n);
+          this.renderParams();
+        } }, icon('x', 11));
+        return h('div', { class: 'param' + (used ? '' : ' unused') }, h('code', {}, label), typeSel, input, nul, remove, used ? null : h('span', { class: 'muted' }, 'unused'));
       }) : h('span', { class: 'muted' }, 'Off: the SQL runs exactly as written.'),
     );
   }
 
-  /** paramValues returns the values to bind, or null when binding is off or not needed. */
-  private paramValues(): Record<string, string | null> | null {
+  /** paramValues returns the typed values to bind, or null when binding is off or not needed. */
+  private paramValues(): Record<string, string | number | boolean | null> | null {
     if (!this.bind.checked || !this.names.length) return null;
-    return Object.fromEntries(this.names.map((n) => [n, this.values.has(n) ? this.values.get(n)! : '']));
+    const out: Record<string, string | number | boolean | null> = {};
+    for (const n of this.names) {
+      const v = this.values.has(n) ? this.values.get(n)! : '';
+      if (v === null) {
+        out[n] = null;
+        continue;
+      }
+      const t = typed(v, this.types.get(n) ?? 'auto');
+      if (t === undefined) throw new Error(`:${n} is not a valid ${this.types.get(n)}`);
+      out[n] = t;
+    }
+    return out;
   }
 
   /** reformat prettifies or minifies the selection, or everything when nothing is selected. */
@@ -191,7 +241,8 @@ export class QueryTab {
     this.setRunning(true);
     const started = performance.now();
     try {
-      const run = await forConn(this.conn, () => Go.RunQuery(this.conn, this.database, this.id, script, 0, this.paramValues() as any));
+      const params = this.paramValues();
+      const run = await forConn(this.conn, () => Go.RunQuery(this.conn, this.database, this.id, script, 0, params as any));
       this.showResults(run.results ?? [], run.error, performance.now() - started);
     } catch (e) {
       this.showResults([], errorMessage(e), performance.now() - started);
@@ -324,4 +375,26 @@ function resizeRows(handle: HTMLElement, box: HTMLElement) {
     document.addEventListener('mousemove', move);
     document.addEventListener('mouseup', up);
   });
+}
+
+type ParamType = 'auto' | 'text' | 'integer' | 'decimal' | 'boolean';
+
+/** typed converts a parameter's text to the value sent to the database; undefined means invalid. */
+function typed(v: string, type: ParamType): string | number | boolean | undefined {
+  const t = v.trim();
+  switch (type) {
+    case 'text':
+      return v;
+    case 'integer':
+      return /^-?\d+$/.test(t) ? Number(t) : undefined;
+    case 'decimal':
+      return /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/.test(t) ? Number(t) : undefined;
+    case 'boolean':
+      return /^(true|1|yes)$/i.test(t) ? true : /^(false|0|no)$/i.test(t) ? false : undefined;
+    default:
+      if (/^-?(0|[1-9]\d{0,14})$/.test(t)) return Number(t); // no leading zeros: "0042" stays text
+      if (/^-?(0|[1-9]\d*)\.\d+$/.test(t)) return Number(t);
+      if (/^(true|false)$/i.test(t)) return t.toLowerCase() === 'true';
+      return v;
+  }
 }
