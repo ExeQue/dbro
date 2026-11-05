@@ -313,3 +313,19 @@ func TestThroughSSHAndTLS(t *testing.T) {
 		c.Close()
 	}
 }
+
+func TestProjectDatabasesOnlyOwn(t *testing.T) {
+	c, name := lerdConn(t, "mysql", 3307, "root")
+	ctx := context.Background()
+	p, _ := c.pool(c.defaultDB())
+	p.ExecContext(ctx, "CREATE DATABASE IF NOT EXISTS "+c.Q(name+"_testing"))
+	t.Cleanup(func() { p.ExecContext(context.Background(), "DROP DATABASE IF EXISTS "+c.Q(name+"_testing")) })
+	c.Cfg.Source, c.Cfg.Database = "lerd-project", name
+	dbs, err := c.Databases(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(dbs, ",") != name+","+name+"_testing" {
+		t.Fatalf("%v", dbs)
+	}
+}

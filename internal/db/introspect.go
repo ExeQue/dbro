@@ -138,9 +138,15 @@ func (c *Conn) Databases(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	// a lerd project only shows its own database and its variants (e.g. app_testing)
+	own := c.Cfg.Source == "lerd-project" && c.Cfg.Database != ""
 	out := make([]string, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, str(r[0]))
+		name := str(r[0])
+		if own && name != c.Cfg.Database && !strings.HasPrefix(name, c.Cfg.Database+"_") {
+			continue
+		}
+		out = append(out, name)
 	}
 	return out, nil
 }
