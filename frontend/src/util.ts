@@ -98,7 +98,7 @@ export function debounce<A extends unknown[]>(f: (...a: A) => void, ms: number) 
 }
 
 /** Copy formats for grid rows. */
-export function rowsAs(format: 'csv' | 'tsv' | 'json' | 'sql' | 'markdown', columns: string[], rows: unknown[][], table = 'table', quoteIdent = (s: string) => '`' + s + '`'): string {
+export function rowsAs(format: 'csv' | 'tsv' | 'json' | 'sql' | 'markdown' | 'php', columns: string[], rows: unknown[][], table = 'table', quoteIdent = (s: string) => '`' + s + '`'): string {
   const csvCell = (v: unknown, sep: string) => {
     if (v === null || v === undefined) return '';
     const s = String(v);
@@ -115,6 +115,11 @@ export function rowsAs(format: 'csv' | 'tsv' | 'json' | 'sql' | 'markdown', colu
       return JSON.stringify(rows.map((r) => Object.fromEntries(columns.map((c, i) => [c, r[i]]))), null, 2);
     case 'sql':
       return rows.map((r) => `INSERT INTO ${quoteIdent(table)} (${columns.map(quoteIdent).join(', ')}) VALUES (${r.map(sqlVal).join(', ')});`).join('\n');
+    case 'php': {
+      const php = (v: unknown) => (v === null || v === undefined ? 'null' : typeof v === 'number' || typeof v === 'boolean' ? String(v) : "'" + String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'") + "'");
+      const one = (r: unknown[]) => '[\n' + columns.map((c, i) => `    '${c}' => ${php(r[i])},`).join('\n') + '\n]';
+      return rows.length === 1 ? one(rows[0]) + ';' : '[\n' + rows.map((r) => one(r).replace(/^/gm, '    ')).join(',\n') + ',\n];';
+    }
     case 'markdown': {
       const esc = (v: unknown) => cellText(v).replace(/\|/g, '\\|').replace(/\n/g, ' ');
       return [`| ${columns.map(esc).join(' | ')} |`, `| ${columns.map(() => '---').join(' | ')} |`, ...rows.map((r) => `| ${r.map(esc).join(' | ')} |`)].join('\n');

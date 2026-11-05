@@ -28,6 +28,8 @@ export interface GridOptions {
   sort?: SortKey[];
   /** onSort is called on a header click; add is true with Ctrl or Shift held (secondary sort). */
   onSort?: (col: string, add: boolean) => void;
+  /** onSortSet replaces the sort order (header menu) */
+  onSortSet?: (sort: SortKey[]) => void;
   onFollow?: (fk: db.ForeignKey, values: unknown[]) => void;
   /** onFilter adds a condition for a cell's value to the table filter */
   onFilter?: (col: string, op: '=' | '<>' | 'IS NULL' | 'IS NOT NULL', value: unknown) => void;
@@ -110,6 +112,18 @@ export class Grid {
         title: this.opt.onSort ? `Sort by ${c} (Ctrl+click adds a column)` : c,
         'aria-sort': at < 0 ? undefined : sort[at].desc ? 'descending' : 'ascending',
         onclick: (e: MouseEvent) => this.opt.onSort?.(c, e.ctrlKey || e.shiftKey || e.metaKey),
+        oncontextmenu: (e: MouseEvent) => {
+          e.preventDefault();
+          const items: MenuItem[] = [{ label: 'Copy column name', action: () => { Go.CopyText(c); toast('Copied'); } }];
+          if (this.opt.onSortSet) {
+            items.push({ label: 'Sort ascending', action: () => this.opt.onSortSet!([{ col: c, desc: false }]) }, { label: 'Sort descending', action: () => this.opt.onSortSet!([{ col: c, desc: true }]) });
+          }
+          if (this.opt.onFilter) {
+            const f = this.opt.onFilter;
+            items.push({ separator: true, label: '' }, { label: `Filter ${c} IS NULL`, action: () => f(c, 'IS NULL', null) }, { label: `Filter ${c} IS NOT NULL`, action: () => f(c, 'IS NOT NULL', null) });
+          }
+          menu(e.clientX, e.clientY, items);
+        },
       }, c, mark, this.types[i] ? h('span', { class: 'type' }, this.types[i]) : null);
     }));
     const body = h('tbody');
@@ -130,8 +144,10 @@ export class Grid {
         const td = document.createElement('td');
         const changed = edit && col in edit.set;
         const v = changed ? edit!.set[col] : row[c];
-        td.textContent = cellText(v).length > 300 ? cellText(v).slice(0, 300) + '…' : cellText(v);
-        let cls = v === null || v === undefined ? 'null' : isNum[c] ? 'num' : '';
+        const text = cellText(v);
+        td.textContent = v === '' ? '(empty)' : text.length > 300 ? text.slice(0, 300) + '…' : text;
+        if (text.length > 40) td.title = text.length > 2000 ? text.slice(0, 2000) + '…' : text;
+        let cls = v === null || v === undefined ? 'null' : v === '' ? 'empty' : isNum[c] ? 'num' : '';
         if (changed) cls += ' changed';
         if (fkCols.has(col)) cls += ' fk';
         if (r === this.cur.r && c === this.cur.c) cls += ' cur';
@@ -370,8 +386,9 @@ export class Grid {
     if (!td) return;
     const v = this.value(r, c);
     td.classList.remove('editing');
-    td.textContent = cellText(v);
+    td.textContent = v === '' ? '(empty)' : cellText(v);
     td.classList.toggle('null', v === null || v === undefined);
+    td.classList.toggle('empty', v === '');
     td.classList.toggle('changed', !!this.edits.get(r) && this.columns[c] in this.edits.get(r)!.set);
     td.classList.toggle('cur', r === this.cur.r && c === this.cur.c);
   }
@@ -423,20 +440,20 @@ export class Grid {
     return rows.map((r) => this.columns.map((_, c) => this.value(r, c)));
   }
 
-  copyText(format: 'tsv' | 'csv' | 'json' | 'sql' | 'markdown' | 'cell'): string {
+  copyText(format: 'tsv' | 'csv' | 'json' | 'sql' | 'markdown' | 'php' | 'cell'): string {
     if (format === 'cell' || (format === 'tsv' && this.selected.size <= 1 && this.cur.c >= 0)) {
       return cellText(this.value(this.cur.r, this.cur.c));
     }
     return rowsAs(format, this.columns, this.selectedRows(), this.opt.table ?? 'table', this.opt.quote);
   }
 
-  async copy(format: 'tsv' | 'csv' | 'json' | 'sql' | 'markdown' | 'cell') {
+  async copy(format: 'tsv' | 'csv' | 'json' | 'sql' | 'markdown' | 'php' | 'cell') {
     await Go.CopyText(this.copyText(format));
     toast('Copied');
   }
 
   /** copyAll copies every row in a format. */
-  async copyAll(format: 'csv' | 'json' | 'sql' | 'markdown') {
+  async copyAll(format: 'csv' | 'json' | 'sql' | 'markdown' | 'php') {
     await Go.CopyText(rowsAs(format, this.columns, this.rows.map((_, r) => this.columns.map((__, c) => this.value(r, c))), this.opt.table ?? 'table', this.opt.quote));
     toast(`Copied ${this.rows.length} rows as ${format.toUpperCase()}`);
   }
@@ -453,6 +470,7 @@ export class Grid {
         { label: 'JSON', action: () => this.copy('json') },
         { label: 'SQL INSERT', action: () => this.copy('sql') },
         { label: 'Markdown', action: () => this.copy('markdown') },
+        { label: 'PHP array', action: () => this.copy('php') },
       ] },
       { label: 'Open in side editor', action: () => this.openSide() },
     ];

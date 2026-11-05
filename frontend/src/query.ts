@@ -351,7 +351,7 @@ export class QueryTab {
         h('div', { class: 'pane-toolbar' },
           h('span', { class: 'muted' }, `${formatCount(r.rows?.length ?? 0)} rows${r.truncated ? ' (cut)' : ''} · ${r.durationMs.toFixed(1)} ms`),
           h('span', { class: 'spacer' }),
-          dropdown('Copy as', () => (['csv', 'json', 'sql', 'markdown'] as const).map((f) => ({ label: f === 'sql' ? 'SQL INSERT' : f.toUpperCase(), action: () => g.copyAll(f) }))),
+          dropdown('Copy as', () => (['csv', 'json', 'sql', 'markdown', 'php'] as const).map((f) => ({ label: f === 'sql' ? 'SQL INSERT' : f === 'php' ? 'PHP array' : f.toUpperCase(), action: () => g.copyAll(f) }))),
           dropdown('Export', () => ['csv', 'json', 'sql'].map((f) => ({ label: f.toUpperCase() + '…', action: async () => {
             try {
               const msg = await Go.ExportRows(this.conn, r.columns, r.rows as any, f, 'result');

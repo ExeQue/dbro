@@ -90,6 +90,11 @@ export class DataTab {
       editable: !isView,
       table: sel.table,
       quote: q,
+      onSortSet: (keys) => {
+        this.sort = keys;
+        this.offset = 0;
+        this.load();
+      },
       onSort: (col, add) => {
         this.sort = nextSort(this.sort, col, add);
         this.offset = 0;
@@ -129,6 +134,7 @@ export class DataTab {
         { label: 'JSON', action: () => this.grid!.copyAll('json') },
         { label: 'SQL INSERT', action: () => this.grid!.copyAll('sql') },
         { label: 'Markdown', action: () => this.grid!.copyAll('markdown') },
+        { label: 'PHP array', action: () => this.grid!.copyAll('php') },
       ]),
       dropdown('Export', () => ['csv', 'json', 'sql'].map((f) => ({ label: `Whole table as ${f.toUpperCase()}`, action: () => actions.exportTable(sel, f, this.effectiveWhere()) }))),
       isView ? null : h('button', { type: 'button', class: 'btn', onclick: () => this.grid!.insertRow() }, icon('plus'), 'Row'),
