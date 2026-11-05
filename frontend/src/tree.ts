@@ -18,7 +18,6 @@ interface ConnNode {
   loading: boolean;
   databases?: string[];
   labels?: Record<string, string>;
-  groups: Record<string, boolean>;
   dbs: Record<string, DbNode>;
 }
 
@@ -46,7 +45,7 @@ export class Tree {
   }
 
   private conn(name: string): ConnNode {
-    return (this.nodes[name] ??= { expanded: false, loading: false, dbs: {}, groups: {} });
+    return (this.nodes[name] ??= { expanded: false, loading: false, dbs: {} });
   }
 
   private dbn(conn: string, db: string): DbNode {
@@ -232,36 +231,8 @@ export class Tree {
           });
         }));
       };
-      // Group databases by "_" prefix like phpMyAdmin: lumberjack, lumberjack_testing, lumberjack_testing_1 ...
       const filterDb = (name: string) => !filter || name.toLowerCase().includes(filter) || this.dbn(c.name, name).expanded;
-      const level = (names: string[], prefix: string, depth: number) => {
-        const buckets = new Map<string, string[]>();
-        for (const name of names) {
-          const seg = name.slice(prefix.length).split('_')[0];
-          buckets.set(seg, [...(buckets.get(seg) ?? []), name]);
-        }
-        for (const [seg, members] of buckets) {
-          const nested = members.some((m) => m.length > prefix.length + seg.length);
-          if (members.length < 2 || !nested) {
-            for (const m of members) if (filterDb(m)) renderDb(m, depth);
-            continue;
-          }
-          const visible = members.filter(filterDb);
-          if (!visible.length) continue;
-          const gkey = c.name + '/~' + prefix + seg;
-          const open = !!filter || !!n.groups[gkey];
-          rows.push(this.node(gkey, depth, {
-            caret: open ? 'open' : 'closed', cls: 'group', lead: icon('db'), label: prefix + seg + '_', meta: String(members.length),
-            onToggle: () => { n.groups[gkey] = !n.groups[gkey]; this.render(); },
-            onSelect: () => { n.groups[gkey] = !n.groups[gkey]; this.render(); },
-          }));
-          if (!open) continue;
-          const exact = members.filter((m) => m === prefix + seg);
-          for (const m of exact) if (filterDb(m)) renderDb(m, depth + 1);
-          level(members.filter((m) => m !== prefix + seg), prefix + seg + '_', depth + 1);
-        }
-      };
-      level(n.databases, '', 1);
+      for (const dbName of n.databases) if (filterDb(dbName)) renderDb(dbName, 1);
     }
     if (!state.connections.length) {
       rows.push(h('div', { class: 'empty', style: { padding: '16px' } }, 'No connections yet.', h('button', { class: 'btn', type: 'button', onclick: () => actions.editConnection() }, icon('plus'), 'New connection')));
