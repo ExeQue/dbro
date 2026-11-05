@@ -303,3 +303,4 @@ table.grid td.editing input.invalid { outline-color: var(--red); }
 .btn.on { background: var(--selection); border-color: var(--accent); }
 .param.unused code { color: var(--dark-foreground); }
 .param .input.invalid { border-color: var(--red); }
+.params-head { display: flex; align-items: center; gap: 8px; }

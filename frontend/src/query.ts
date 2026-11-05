@@ -36,6 +36,7 @@ export class QueryTab {
   private params = h('div', { class: 'params' });
   private names: string[] = []; // parameters the query uses
   private extra: string[] = []; // parameters added by hand, used or not
+  private adding = false; // the + button shows one empty row
   private values = new Map<string, string | null>();
   private types = new Map<string, ParamType>();
   private bind = h('input', { type: 'checkbox', checked: true, 'aria-label': 'Bind parameters' });
@@ -174,6 +175,7 @@ export class QueryTab {
         if (!this.extra.includes(name) && !this.names.includes(name)) this.extra.push(name);
         if (value.value !== '' || !this.values.has(name)) this.values.set(name, value.value);
         this.types.set(name, typeSel.value as ParamType);
+        this.adding = false;
         this.renderParams();
         if (focusValue) (this.params.querySelector(`[data-param="${name}"]`) as HTMLElement | null)?.focus();
       };
@@ -195,6 +197,11 @@ export class QueryTab {
             e.preventDefault();
             create(true);
           } else if (n !== null && e.key === 'Enter') rename();
+          else if (n === null && e.key === 'Escape') {
+            e.stopPropagation();
+            this.adding = false;
+            this.renderParams();
+          }
         });
         key.addEventListener('change', () => (n === null ? create(false) : rename()));
       }
@@ -225,8 +232,14 @@ export class QueryTab {
       return h('div', { class: 'param' + (n !== null && !used ? ' unused' : '') + (n === null ? ' new' : ''), title: n !== null && !used ? 'Not used in the query yet' : undefined }, key, typeSel, value, nul, remove);
     };
     clear(this.params,
-      h('label', { class: 'check params-toggle', title: 'Send the values as prepared statement parameters' }, this.bind, ` Parameters${all.length ? ` (${all.length})` : ''}`),
-      this.bind.checked ? h('div', { class: 'param-list' }, all.map(row), row(null)) : h('span', { class: 'muted' }, 'Off: the SQL runs exactly as written.'),
+      h('div', { class: 'params-head' },
+        h('label', { class: 'check params-toggle', title: 'Send the values as prepared statement parameters' }, this.bind, ` Parameters${all.length ? ` (${all.length})` : ''}`),
+        this.bind.checked ? h('button', { type: 'button', class: 'btn icon small', 'aria-label': 'Add parameter', title: 'Add parameter', onclick: () => {
+          this.adding = true;
+          this.renderParams();
+          (this.params.querySelector('.param.new .param-name') as HTMLElement | null)?.focus();
+        } }, icon('plus', 12)) : null),
+      this.bind.checked ? (all.length || this.adding ? h('div', { class: 'param-list' }, all.map(row), this.adding ? row(null) : null) : null) : h('span', { class: 'muted' }, 'Off: the SQL runs exactly as written.'),
     );
   }
 
