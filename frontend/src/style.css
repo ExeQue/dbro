@@ -305,3 +305,7 @@ table.grid td.editing input.invalid { outline-color: var(--red); }
 .param.unused code { color: var(--dark-foreground); }
 .param .input.invalid { border-color: var(--red); }
 .params-head { display: flex; align-items: center; gap: 8px; }
+.palette .list-item { align-items: center; }
+.palette .list-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.palette .list-icon { width: 14px; flex: none; }
+.palette .kbd { margin-left: 8px; flex: none; }

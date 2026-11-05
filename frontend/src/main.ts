@@ -51,7 +51,7 @@ function layout() {
     h('button', { type: 'button', class: 'btn', title: 'Refresh (F5)', 'aria-label': 'Refresh', onclick: () => refresh() }, icon('refresh'), h('span', { class: 'lbl' }, 'Refresh'), h('span', { class: 'shortcut' }, 'F5')),
     h('button', { type: 'button', class: 'btn', title: 'New query (Ctrl+T)', 'aria-label': 'New query', onclick: () => openQuery(state.selection) }, icon('file'), h('span', { class: 'lbl' }, 'New query'), h('span', { class: 'shortcut' }, 'Ctrl+T')),
     h('span', { class: 'spacer' }),
-    h('button', { type: 'button', class: 'btn', title: 'Quick search (Ctrl+P)', 'aria-label': 'Quick search', onclick: () => actions.quickSearch() }, icon('search'), h('span', { class: 'lbl' }, 'Quick search'), h('span', { class: 'shortcut' }, 'Ctrl+P')),
+    h('button', { type: 'button', class: 'btn', title: 'Commands and tables (Ctrl+K), tables only (Ctrl+P)', 'aria-label': 'Command palette', onclick: () => commandPalette() }, icon('search'), h('span', { class: 'lbl' }, 'Search'), h('span', { class: 'shortcut' }, 'Ctrl+K')),
     h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Settings', title: 'Settings', onclick: () => actions.settings() }, icon('gear', 16)),
   );
   const main = h('main', { class: 'main' }, breadcrumb, tabbar, content);
@@ -218,6 +218,9 @@ document.addEventListener('keydown', async (e) => {
     case 'Ctrl+p':
       e.preventDefault();
       return actions.quickSearch();
+    case 'Ctrl+k':
+      e.preventDefault();
+      return commandPalette();
     case 'Ctrl+w':
       if (queries.some((q) => q.id === active)) {
         e.preventDefault();
@@ -243,6 +246,49 @@ document.addEventListener('keydown', async (e) => {
       return actions.editConnection();
   }
 });
+
+/** commandPalette (Ctrl+K) lists commands for the current selection, then every loaded table. */
+async function commandPalette() {
+  const sel = state.selection;
+  const cmds: actions.PaletteItem[] = [
+    { label: 'New query', icon: 'file', shortcut: 'Ctrl+T', run: () => openQuery(state.selection) },
+    { label: 'New connection', icon: 'plus', shortcut: 'Ctrl+N', run: () => actions.editConnection() },
+    { label: 'Refresh', icon: 'refresh', shortcut: 'F5', run: () => refresh() },
+    { label: 'Settings', icon: 'gear', shortcut: 'Ctrl+,', run: () => actions.settings() },
+    { label: 'Toggle SQL log', run: () => logBox.classList.toggle('collapsed') },
+  ];
+  if (sel && (sel.kind === 'table' || sel.kind === 'view')) {
+    const t = sel.table!;
+    cmds.unshift(
+      { label: `Open data: ${t}`, icon: 'table', run: () => showTab('data') },
+      { label: `Open structure: ${t}`, icon: 'table', run: () => showTab('structure') },
+      ...(['SELECT', 'INSERT', 'UPDATE', 'DELETE'] as const).filter((k) => sel.kind === 'table' || k === 'SELECT').map((k) => ({ label: `Generate ${k}: ${t}`, icon: 'file', run: () => actions.generateSQL(sel, k) })),
+      ...['csv', 'json', 'sql'].map((f) => ({ label: `Export ${t} as ${f.toUpperCase()}`, run: () => actions.exportTable(sel, f) })),
+      { label: `Import CSV into ${t}`, run: () => actions.importCSV(sel) },
+      { label: `Clone ${t} to…`, run: () => actions.cloneTo(sel) },
+      { label: `Copy name: ${t}`, run: () => Go.CopyText(t) },
+    );
+  }
+  if (sel?.db && sel.kind !== 'connection') {
+    const dbSel: Selection = { kind: 'database', conn: sel.conn, db: sel.db };
+    cmds.push(
+      { label: `New table in ${sel.db}`, icon: 'plus', run: () => actions.newTable(dbSel) },
+      { label: `Dump ${sel.db}…`, run: () => actions.dump(dbSel) },
+      { label: `Import SQL into ${sel.db}…`, run: () => actions.importSQL(dbSel) },
+      { label: `Clone ${sel.db} to…`, run: () => actions.cloneTo(dbSel) },
+    );
+  }
+  for (const t of await Go.ListThemes().catch(() => [])) {
+    cmds.push({ label: `Theme: ${t.name}`, run: async () => {
+      const th = await Go.SetTheme(t.id);
+      applyTheme(th);
+      state.boot.settings.theme = t.id;
+      state.boot.theme = th;
+      updateStatus();
+    } });
+  }
+  await actions.palette('Command palette', [...cmds, ...actions.tableItems()], 'Type a command or a table…');
+}
 
 window.addEventListener('beforeunload', (e) => {
   if (data.dirty) e.preventDefault();

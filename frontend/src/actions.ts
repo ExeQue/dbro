@@ -2,7 +2,7 @@
 import { h, clear, icon } from './util';
 import { Go, forConn, call } from './api';
 import { modal, confirm, prompt, toast, showError, errorMessage, field, type MenuItem } from './dialogs';
-import { state, emit, connInfo, dialect, quoteIdent, type Selection } from './state';
+import { state, emit, connInfo, dialect, quoteIdent, displayName, type Selection } from './state';
 import { applyTheme, currentTheme, applyFont } from './theme';
 import type { Tree } from './tree';
 import { config, db } from '../wailsjs/go/models';
@@ -390,22 +390,33 @@ export async function editConnection(name?: string, duplicate = false) {
 
 // ---- quick search, settings ----
 
-export async function quickSearch() {
-  const all = tree.allTables();
-  const input = h('input', { class: 'input', placeholder: all.length ? 'Table name…' : 'Expand a database first', style: { width: '100%' }, 'aria-label': 'Search tables' });
-  const list = h('div', { class: 'list', role: 'listbox' });
-  let hits: Selection[] = [];
+export interface PaletteItem {
+  label: string;
+  sub?: string;
+  icon?: string;
+  shortcut?: string;
+  run: () => unknown;
+}
+
+/** palette is a keyboard-first fuzzy picker (Ctrl+K for commands and tables, Ctrl+P for tables). */
+export async function palette(title: string, items: PaletteItem[], placeholder: string) {
+  const input = h('input', { class: 'input', placeholder, style: { width: '100%' }, 'aria-label': title });
+  const list = h('div', { class: 'list palette', role: 'listbox' });
+  let hits: PaletteItem[] = [];
   let idx = 0;
-  let close: (() => void) | null = null;
   const render = () => {
-    const q = input.value.toLowerCase();
-    hits = all.filter((t) => fuzzy(q, t.table!.toLowerCase())).slice(0, 50);
+    const q = input.value.toLowerCase().trim();
+    hits = (q ? items.filter((it) => fuzzy(q, (it.label + ' ' + (it.sub ?? '')).toLowerCase())) : items).slice(0, 60);
     idx = Math.min(idx, Math.max(hits.length - 1, 0));
-    clear(list, hits.map((t, i) => h('button', { type: 'button', role: 'option', class: 'list-item' + (i === idx ? ' on' : ''), onclick: () => go(t) }, icon(t.kind === 'view' ? 'view' : 'table'), t.table, h('span', { class: 'sub' }, `${t.conn} / ${t.db}`))));
+    clear(list, hits.length ? hits.map((it, i) => h('button', { type: 'button', role: 'option', 'aria-selected': String(i === idx), class: 'list-item' + (i === idx ? ' on' : ''), onclick: () => go(it) },
+      it.icon ? icon(it.icon) : h('span', { class: 'list-icon' }), h('span', { class: 'list-label' }, it.label), it.sub ? h('span', { class: 'sub' }, it.sub) : null, it.shortcut ? h('span', { class: 'kbd' }, it.shortcut) : null))
+      : h('p', { class: 'muted', style: { padding: '8px 10px', margin: 0 } }, 'Nothing matches.'));
+    list.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
   };
-  const go = (t: Selection) => {
-    close?.();
-    tree.reveal(t);
+  const close = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  const go = (it: PaletteItem) => {
+    close();
+    setTimeout(() => it.run(), 0);
   };
   input.addEventListener('input', () => { idx = 0; render(); });
   input.addEventListener('keydown', (e) => {
@@ -417,12 +428,17 @@ export async function quickSearch() {
     render();
   });
   render();
-  const p = modal('Quick search', h('div', { class: 'form' }, input, list), [{ label: 'Close' }]);
-  close = () => {
-    const ev = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true });
-    document.dispatchEvent(ev);
-  };
-  await p;
+  await modal(title, h('div', { class: 'form' }, input, list), [{ label: 'Close' }]);
+}
+
+/** tableItems lists every loaded table and view for the palettes. */
+export function tableItems(): PaletteItem[] {
+  return tree.allTables().map((t) => ({ label: t.table!, sub: `${displayName(t.conn)} / ${t.db}`, icon: t.kind === 'view' ? 'view' : 'table', run: () => tree.reveal(t) }));
+}
+
+export async function quickSearch() {
+  const items = tableItems();
+  await palette('Quick search', items, items.length ? 'Table name…' : 'Expand a database first');
 }
 
 function fuzzy(q: string, s: string) {
