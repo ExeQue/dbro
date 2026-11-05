@@ -6,12 +6,12 @@ import { sql, MySQL, PostgreSQL, SQLite, MariaSQL, keywordCompletionSource, sche
 import { autocompletion, type CompletionContext, type CompletionSource } from '@codemirror/autocomplete';
 import { syntaxHighlighting } from '@codemirror/language';
 import { highlight } from './highlight';
-import { prettify, minify } from './sqlformat';
+import { prettify, minify, statementAt } from './sqlformat';
 import { h, clear, icon, nextId, formatCount, debounce } from './util';
 import { Go, forConn } from './api';
 import { Grid, nextSort } from './grid';
 import { dropdown, toast, prompt, modal, errorMessage, type MenuItem } from './dialogs';
-import { connInfo, dialect, quoteIdent, type Selection } from './state';
+import { connInfo, dialect, quoteIdent, displayName, emit, type Selection } from './state';
 import type { db } from '../wailsjs/go/models';
 
 
@@ -53,6 +53,7 @@ export class QueryTab {
           Prec.highest(keymap.of([
             { key: 'Mod-Enter', run: () => (this.run(), true) },
             { key: 'Shift-Mod-Enter', run: () => (this.explain(), true) },
+            { key: 'Alt-Enter', run: () => (this.runCurrent(), true) },
             { key: 'Shift-Mod-f', run: () => (this.reformat(false), true) },
           ])),
           basicSetup,
@@ -61,7 +62,11 @@ export class QueryTab {
           syntaxHighlighting(highlight),
           placeholder('SELECT … — Ctrl+Enter runs the selection, or everything when nothing is selected'),
           EditorView.lineWrapping,
-          EditorView.updateListener.of((u) => u.docChanged && this.detect()),
+          EditorView.updateListener.of((u) => {
+            if (!u.docChanged) return;
+            this.detect();
+            this.changed();
+          }),
         ],
       }),
     });
@@ -70,6 +75,7 @@ export class QueryTab {
     resizeRows(split, editorBox);
     this.el.append(
       h('div', { class: 'pane-toolbar' }, this.runBtn, this.stopBtn,
+        h('button', { type: 'button', class: 'btn', title: 'Run the statement under the cursor (Alt+Enter)', onclick: () => this.runCurrent() }, 'Run current'),
         h('button', { type: 'button', class: 'btn', onclick: () => this.explain() }, 'Explain'),
         h('button', { type: 'button', class: 'btn', title: 'Prettify (Ctrl+Shift+F)', onclick: () => this.reformat(false) }, 'Prettify'),
         h('button', { type: 'button', class: 'btn', title: 'Minify', onclick: () => this.reformat(true) }, 'Minify'),
@@ -95,7 +101,8 @@ export class QueryTab {
     const d = dialect(sel.conn);
     const driver = connInfo(sel.conn)?.driver;
     const dial = d === 'postgres' ? PostgreSQL : d === 'sqlite' ? SQLite : driver === 'mariadb' ? MariaSQL : MySQL;
-    this.target.textContent = `${this.conn}${this.database ? ' / ' + this.database : ''}`;
+    this.target.textContent = `${displayName(this.conn)}${this.database ? ' / ' + this.database : ''}`;
+    emit('queriesChanged');
     this.view.dispatch({ effects: [this.lang.reconfigure(sql({ dialect: dial, upperCaseKeywords: true })), this.complete.reconfigure(autocompletion({ override: this.sources(dial, {}) }))] });
     if (this.database) {
       forConn(this.conn, () => Go.Completions(this.conn, this.database)).then((schema) => {
@@ -107,6 +114,22 @@ export class QueryTab {
 
   focus() {
     this.view.focus();
+  }
+
+  /** content is the whole editor text (saved between restarts). */
+  content() {
+    return this.view.state.doc.toString();
+  }
+
+  private changed = debounce(() => emit('queriesChanged'), 500);
+
+  /** runCurrent runs only the statement under the cursor (Alt+Enter). */
+  runCurrent() {
+    const doc = this.view.state.doc.toString();
+    const [from, to] = statementAt(doc, this.view.state.selection.main.head);
+    if (from === to) return;
+    this.view.dispatch({ selection: { anchor: from, head: to } });
+    this.run();
   }
 
   /** text returns the selection, or everything. */
@@ -355,7 +378,7 @@ export class QueryTab {
       onclick: () => { picked = e.sql; document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); },
       title: minify(e.sql),
     }, h('span', { class: 'history-sql' }, minify(e.sql)), h('span', { class: 'sub' }, `${e.database} · ${new Date(e.time).toLocaleString()}`))) : h('p', { class: 'muted', style: { padding: '10px' } }, 'No history yet.'));
-    await modal(`History for ${this.conn || 'this connection'}`, list, [{ label: 'Close' }], { wide: true });
+    await modal(`History for ${this.conn ? displayName(this.conn) : 'this connection'}`, list, [{ label: 'Close' }], { wide: true });
     if (picked) this.setText(picked);
   }
 

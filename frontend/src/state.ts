@@ -19,6 +19,11 @@ export const state = {
   selection: null as Selection | null,
 };
 
+/** displayName drops the internal source prefixes: "lerd project · app" shows as "app". */
+export function displayName(name: string): string {
+  return name.replace(/^lerd project · /, '').replace(/^lerd · /, 'lerd ');
+}
+
 export function connInfo(name: string): config.Connection | undefined {
   return state.connections.find((c) => c.name === name);
 }

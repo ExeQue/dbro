@@ -51,6 +51,7 @@ export function tableMenu(sel: Selection, t: Tree): MenuItem[] {
     { label: 'Open data', action: () => emit('showTab', 'data') },
     { label: 'Open structure', action: () => emit('showTab', 'structure') },
     { label: 'Copy name', action: () => Go.CopyText(sel.table!) },
+    { label: 'Generate SQL', items: (['SELECT', 'INSERT', 'UPDATE', 'DELETE'] as const).map((k) => ({ label: k, disabled: isView && k !== 'SELECT', action: () => generateSQL(sel, k) })) },
     { separator: true, label: '' },
     { label: 'Export', items: ['csv', 'json', 'sql'].map((f) => ({ label: f.toUpperCase() + '…', action: () => exportTable(sel, f) })) },
     { label: 'Import CSV…', disabled: isView, action: () => importCSV(sel) },
@@ -493,6 +494,29 @@ export async function askOmarchy() {
     applyTheme(t);
     state.boot.settings.theme = r === 1 ? 'omarchy' : state.boot.settings.theme;
     emit('themeChanged', t);
+  } catch (e) {
+    showError(e);
+  }
+}
+
+/** generateSQL opens a query tab with a statement for the table, using :column parameters. */
+export async function generateSQL(sel: Selection, kind: 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE') {
+  try {
+    const def = await forConn(sel.conn, () => Go.Describe(sel.conn, sel.db!, sel.schema ?? '', sel.table!));
+    const q = quoteIdent(sel.conn);
+    const table = sel.schema && dialect(sel.conn) === 'postgres' && sel.schema !== 'public' ? `${q(sel.schema)}.${q(sel.table!)}` : q(sel.table!);
+    const cols = def.columns.map((c) => c.name);
+    const pk = def.indexes?.find((i) => i.primary)?.columns ?? cols.slice(0, 1);
+    const where = pk.map((c) => `${q(c)} = :${c}`).join('\n  AND ');
+    const insertable = def.columns.filter((c) => !c.autoIncrement).map((c) => c.name);
+    const sql = {
+      SELECT: `SELECT ${cols.map(q).join(',\n       ')}\nFROM ${table}\nWHERE ${where}\nLIMIT 100;`,
+      INSERT: `INSERT INTO ${table} (${insertable.map(q).join(', ')})\nVALUES (${insertable.map((c) => ':' + c).join(', ')});`,
+      UPDATE: `UPDATE ${table}\nSET ${cols.filter((c) => !pk.includes(c)).map((c) => `${q(c)} = :${c}`).join(',\n    ')}\nWHERE ${where};`,
+      DELETE: `DELETE FROM ${table}\nWHERE ${where};`,
+    }[kind];
+    const { openQuery } = await import('./main');
+    openQuery({ kind: 'database', conn: sel.conn, db: sel.db }, sql);
   } catch (e) {
     showError(e);
   }

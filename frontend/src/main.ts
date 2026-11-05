@@ -2,7 +2,7 @@ import './style.css';
 import { EventsOn } from '../wailsjs/runtime/runtime';
 import { h, clear, icon } from './util';
 import { Go } from './api';
-import { state, on, emit, connInfo, type Selection } from './state';
+import { state, on, emit, connInfo, displayName, type Selection } from './state';
 import { applyTheme, applyFont } from './theme';
 import { Tree } from './tree';
 import { DataTab, welcome } from './datatab';
@@ -80,7 +80,7 @@ function renderTabs() {
     tab('structure', sel?.kind === 'routine' ? 'Source' : 'Structure'),
     queries.map((q) => tab(q.id, q.title, true)),
     h('button', { type: 'button', class: 'tab', 'aria-label': 'New query tab', title: 'New query (Ctrl+T)', onclick: () => openQuery(state.selection) }, icon('plus', 12)));
-  const crumbs = sel ? [sel.conn, sel.db, sel.table ?? sel.routine?.name].filter(Boolean) as string[] : [];
+  const crumbs = sel ? [displayName(sel.conn), sel.db, sel.table ?? sel.routine?.name].filter(Boolean) as string[] : [];
   clear(breadcrumb, crumbs.flatMap((c, i) => [i ? '  ›  ' : '', i === crumbs.length - 1 ? h('b', {}, c) : c]));
 }
 
@@ -99,17 +99,43 @@ function showTab(id: TabId) {
   renderTabs();
 }
 
-export function openQuery(sel: Selection | null, text = '') {
+export function openQuery(sel: Selection | null, text = '', show = true) {
   const q = new QueryTab(++queryCount, sel, text);
   queries.push(q);
-  showTab(q.id);
+  if (show) showTab(q.id);
+  else renderTabs();
+  saveQueries();
 }
+
+// Query tabs survive restarts: their text and target are kept in this browser profile.
+const QUERIES_KEY = 'dbro.queryTabs';
+function saveQueries() {
+  try {
+    localStorage.setItem(QUERIES_KEY, JSON.stringify(queries.map((q) => ({ conn: q.conn, db: q.database, text: q.content() }))));
+  } catch {
+    // storage unavailable: tabs just won't be restored
+  }
+}
+function restoreQueries() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(QUERIES_KEY) ?? '[]') as { conn: string; db: string; text: string }[];
+    for (const t of saved) {
+      if (!t.text.trim()) continue;
+      const known = connInfo(t.conn);
+      openQuery(known ? { kind: 'database', conn: t.conn, db: t.db } : null, t.text, false);
+    }
+  } catch {
+    // ignore broken saved state
+  }
+}
+on('queriesChanged', () => saveQueries());
 
 async function closeQuery(id: TabId) {
   const i = queries.findIndex((q) => q.id === id);
   if (i < 0) return;
   queries[i].dispose();
   queries.splice(i, 1);
+  saveQueries();
   if (active === id) showTab(queries[i - 1]?.id ?? queries[i]?.id ?? 'data');
   else renderTabs();
 }
@@ -127,7 +153,7 @@ async function refresh() {
 function updateStatus() {
   const sel = state.selection;
   const c = sel ? connInfo(sel.conn) : undefined;
-  statusLeft.textContent = c ? `${c.name} · ${c.driver}${c.driver === 'sqlite' ? ' · ' + c.file : ` · ${c.host || '127.0.0.1'}${c.port ? ':' + c.port : ''}`}${c.ssh?.host ? ' via ' + c.ssh.host : ''}` : 'No connection selected';
+  statusLeft.textContent = c ? `${displayName(c.name)} · ${c.driver}${c.driver === 'sqlite' ? ' · ' + c.file : ` · ${c.host || '127.0.0.1'}${c.port ? ':' + c.port : ''}`}${c.ssh?.host ? ' via ' + c.ssh.host : ''}` : 'No connection selected';
   statusRight.textContent = `MCP: ${c?.hideFromAgents ? 'hidden' : c?.allowAgentWrites ? 'read/write' : 'read-only'} · ${state.boot?.theme?.name ?? ''}`;
 }
 
@@ -139,7 +165,7 @@ function addLog(e: LogEntry) {
   const line = h('div', { class: 'log-line' + (e.error ? ' error' : ''), title: e.error ? e.sql + '\n\n' + e.error : e.sql },
     h('span', { class: 'time' }, t.toLocaleTimeString('en-GB')),
     h('span', { class: 'src ' + e.source }, `[${e.source}]`),
-    h('span', { class: 'muted' }, e.conn),
+    h('span', { class: 'muted' }, displayName(e.conn)),
     h('span', { class: 'sql' }, e.sql.replace(/\s+/g, ' ') + (e.error ? '  -- ' + e.error : '')),
     h('span', { class: 'dur' }, `${e.durationMs.toFixed(1)} ms${e.rows ? ' · ' + e.rows + ' rows' : ''}`));
   const stick = logBox.scrollTop + logBox.clientHeight >= logBox.scrollHeight - 4;
@@ -238,6 +264,7 @@ async function start() {
   });
   await tree.reload();
   if (state.boot.settings.lerdAutoConnect) tree.autoConnectLerd();
+  restoreQueries();
   clear(data.el, welcome());
   showTab('data');
   updateStatus();

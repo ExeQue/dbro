@@ -263,6 +263,7 @@ legend { color: var(--light-foreground); padding: 0 4px; }
 
 /* ---- filter field and cell editors ---- */
 .filter-bar { align-items: flex-start; }
+.filter-bar > label > svg { margin-top: 8px; flex: none; }
 .where-label { color: var(--magenta); padding-top: 6px; }
 .where-field { flex: 3 1 320px; min-width: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--background); resize: vertical; overflow: auto; min-height: 30px; max-height: 40vh; }
 .where-field:focus-within { border-color: var(--accent); }
