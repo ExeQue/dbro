@@ -1,10 +1,10 @@
 // The Data tab: paged, sortable, filterable, editable rows of one table,
 // or an overview when a database or connection is selected.
-import { h, clear, icon, formatCount, formatBytes } from './util';
+import { h, clear, icon, formatCount, formatBytes, debounce } from './util';
 import { Go, forConn } from './api';
 import { Grid } from './grid';
 import { dropdown, toast, errorMessage, confirm, showError } from './dialogs';
-import { state, connInfo, quoteIdent, type Selection } from './state';
+import { state, connInfo, quoteIdent, dialect, type Selection } from './state';
 import * as actions from './actions';
 import { logo } from './logo';
 import type { db } from '../wailsjs/go/models';
@@ -22,17 +22,43 @@ export class DataTab {
   private total = 0;
   private pending = h('div', { class: 'pending-bar', hidden: true });
   private info = h('span', { class: 'pager' });
-  private whereInput = h('input', { class: 'input', style: { flex: '1', minWidth: '200px' }, placeholder: "WHERE …  e.g. email LIKE '%@example.com'", 'aria-label': 'Filter rows (WHERE clause)', spellcheck: 'false' });
+  private whereInput = h('input', { class: 'input', style: { flex: '3 1 260px' }, placeholder: "WHERE …  e.g. email LIKE '%@example.com'", 'aria-label': 'Filter rows (WHERE clause)', spellcheck: 'false' });
+  private quickInput = h('input', { class: 'input', type: 'search', style: { flex: '1 1 180px' }, placeholder: 'Quick filter: search all columns', 'aria-label': 'Quick filter across all columns', spellcheck: 'false' });
   private token = 0;
 
   constructor() {
     this.whereInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        this.where = this.whereInput.value;
-        this.offset = 0;
-        this.load();
-      }
+      if (e.key === 'Enter') this.applyFilter();
     });
+    const live = debounce(() => this.applyFilter(), 400);
+    this.quickInput.addEventListener('input', live);
+    this.quickInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.applyFilter();
+    });
+  }
+
+  /** applyFilter combines the quick filter and the WHERE field, like HeidiSQL's filter panel. */
+  private applyFilter() {
+    this.where = this.whereInput.value.trim();
+    this.offset = 0;
+    if (this.where) remember(this.sel!, this.where);
+    this.load();
+  }
+
+  /** effectiveWhere is the WHERE sent to the server: the typed condition AND the quick filter. */
+  private effectiveWhere(): string {
+    const parts: string[] = [];
+    if (this.where) parts.push(`(${this.where})`);
+    const q = this.quickInput.value.trim();
+    if (q && this.def?.columns.length && this.sel) {
+      const d = dialect(this.sel.conn);
+      const quote = quoteIdent(this.sel.conn);
+      const lit = "'%" + q.replace(/'/g, "''") + "%'";
+      const one = (c: string) =>
+        d === 'postgres' ? `${quote(c)}::text ILIKE ${lit}` : d === 'mysql' ? `CAST(${quote(c)} AS CHAR) LIKE ${lit}` : `CAST(${quote(c)} AS TEXT) LIKE ${lit}`;
+      parts.push('(' + this.def.columns.map((c) => one(c.name)).join(' OR ') + ')');
+    }
+    return parts.join(' AND ');
   }
 
   get dirty() {
@@ -45,6 +71,7 @@ export class DataTab {
     this.sel = sel;
     this.where = '';
     this.whereInput.value = '';
+    this.quickInput.value = '';
     this.sort = null;
     this.offset = 0;
     this.def = null;
@@ -70,9 +97,17 @@ export class DataTab {
       onFollow: (fk, values) => actions.followForeignKey(sel, fk, values),
       onChange: () => this.updatePending(),
     });
-    const toolbar = h('div', { class: 'pane-toolbar' },
+    const filters = h('div', { class: 'pane-toolbar filter-bar' },
+      h('label', { style: { display: 'contents' } }, icon('search'), this.quickInput),
       h('label', { style: { display: 'contents' } }, h('b', { style: { color: 'var(--magenta)' } }, 'WHERE'), this.whereInput),
-      h('button', { type: 'button', class: 'btn', onclick: () => { this.where = this.whereInput.value; this.offset = 0; this.load(); } }, 'Apply'),
+      dropdown('Recent', () => {
+        const list = recent(sel);
+        return list.length ? list.map((w) => ({ label: w.length > 70 ? w.slice(0, 70) + '…' : w, action: () => { this.whereInput.value = w; this.applyFilter(); } })) : [{ label: 'No recent filters', disabled: true }];
+      }),
+      h('button', { type: 'button', class: 'btn', onclick: () => this.applyFilter() }, 'Apply'),
+      h('button', { type: 'button', class: 'btn', onclick: () => { this.whereInput.value = ''; this.quickInput.value = ''; this.applyFilter(); } }, 'Clear'),
+    );
+    const toolbar = h('div', { class: 'pane-toolbar' },
       this.info,
       h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Previous page', onclick: () => this.page(-1) }, '‹'),
       h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Next page', onclick: () => this.page(1) }, '›'),
@@ -82,11 +117,11 @@ export class DataTab {
         { label: 'SQL INSERT', action: () => this.grid!.copyAll('sql') },
         { label: 'Markdown', action: () => this.grid!.copyAll('markdown') },
       ]),
-      dropdown('Export', () => ['csv', 'json', 'sql'].map((f) => ({ label: `Whole table as ${f.toUpperCase()}`, action: () => actions.exportTable(sel, f, this.where) }))),
+      dropdown('Export', () => ['csv', 'json', 'sql'].map((f) => ({ label: `Whole table as ${f.toUpperCase()}`, action: () => actions.exportTable(sel, f, this.effectiveWhere()) }))),
       isView ? null : h('button', { type: 'button', class: 'btn', onclick: () => this.grid!.insertRow() }, icon('plus'), 'Row'),
       h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Refresh', title: 'Refresh (F5)', onclick: () => this.load() }, icon('refresh')),
     );
-    clear(this.el, toolbar, this.grid.el, this.pending);
+    clear(this.el, filters, toolbar, this.grid.el, this.pending);
     try {
       this.def = await forConn(sel.conn, () => Go.Describe(sel.conn, sel.db!, sel.schema ?? '', sel.table!));
       this.grid.opt.pk = this.def.columns.length ? pkOf(this.def) : [];
@@ -104,7 +139,7 @@ export class DataTab {
     const token = ++this.token;
     this.info.textContent = 'Loading…';
     try {
-      const r = await forConn(sel.conn, () => Go.Browse(sel.conn, sel.db!, sel.schema ?? '', sel.table!, this.where, this.sort?.col ?? '', this.sort?.desc ?? false, this.offset, PAGE));
+      const r = await forConn(sel.conn, () => Go.Browse(sel.conn, sel.db!, sel.schema ?? '', sel.table!, this.effectiveWhere(), this.sort?.col ?? '', this.sort?.desc ?? false, this.offset, PAGE));
       if (token !== this.token) return;
       this.total = r.total;
       this.grid.opt.sort = this.sort;
@@ -131,6 +166,7 @@ export class DataTab {
   async filterBy(where: string) {
     this.where = where;
     this.whereInput.value = where;
+    this.quickInput.value = '';
     this.offset = 0;
     await this.load();
   }
@@ -219,4 +255,26 @@ export function welcome() {
     h('div', {}, h('b', {}, 'dbro'), ' · your database bro'),
     state.connections.length ? h('div', {}, 'Pick a table in the tree, or press ', h('span', { class: 'kbd' }, 'Ctrl+P'), ' to search.') : h('button', { type: 'button', class: 'btn primary', onclick: () => actions.editConnection() }, icon('plus'), 'New connection'),
   );
+}
+
+// Recent WHERE filters per table, kept in this browser profile only.
+function recentKey(sel: Selection) {
+  return `dbro.filters.${sel.conn}/${sel.db}/${sel.schema ?? ''}/${sel.table}`;
+}
+
+function recent(sel: Selection): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(recentKey(sel)) ?? '[]');
+  } catch {
+    return [];
+  }
+}
+
+function remember(sel: Selection, where: string) {
+  try {
+    const list = [where, ...recent(sel).filter((w) => w !== where)].slice(0, 10);
+    localStorage.setItem(recentKey(sel), JSON.stringify(list));
+  } catch {
+    // storage unavailable: recent filters are a convenience only
+  }
 }

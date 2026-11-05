@@ -93,6 +93,7 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .node.conn .label { font-weight: 600; }
 .node.closed .label { color: var(--light-foreground); }
 .node .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.node svg { flex: none; }
 .node .spinner { width: 10px; height: 10px; border: 2px solid var(--dark-foreground); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
 .node.group .label { color: var(--dark-foreground); font-size: 12px; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -107,6 +108,7 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .breadcrumb { padding: 6px 12px 0; color: var(--dark-foreground); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
 .breadcrumb b { color: var(--foreground); font-weight: 400; }
 .pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.filter-bar { background: var(--dark-background); }
 .pane-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex: none; }
 .empty { flex: 1; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; color: var(--dark-foreground); text-align: center; padding: 20px; }
 .empty .logo { width: 88px; height: 88px; opacity: 0.9; }
