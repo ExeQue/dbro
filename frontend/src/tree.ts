@@ -26,13 +26,15 @@ const colors: Record<string, string> = { red: 'var(--red)', green: 'var(--green)
 export class Tree {
   el = h('div', { class: 'tree', role: 'tree', 'aria-label': 'Connections' });
   filterInput = h('input', { class: 'input', type: 'search', placeholder: 'Filter…', 'aria-label': 'Filter tree' });
-  root = h('nav', { class: 'sidebar-inner', style: { display: 'contents' } }, h('div', { class: 'tree-filter' }, this.filterInput), this.el);
+  thumb = h('div', { class: 'overlay-thumb', 'aria-hidden': 'true' });
+  root = h('nav', { class: 'sidebar-inner', style: { display: 'contents' } }, h('div', { class: 'tree-filter' }, this.filterInput), h('div', { class: 'tree-wrap' }, this.el, this.thumb));
   private nodes: Record<string, ConnNode> = {};
   private selectedKey = '';
 
   constructor() {
     this.filterInput.addEventListener('input', () => this.render());
     this.el.addEventListener('keydown', (e) => this.onKey(e));
+    overlayScrollbar(this.el, this.thumb);
   }
 
   async reload() {
@@ -295,4 +297,33 @@ export class Tree {
       if (document.activeElement === document.body) this.el.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`)?.focus();
     });
   }
+}
+
+/** overlayScrollbar keeps a thin draggable thumb in sync with a scroller whose native bar is hidden. */
+function overlayScrollbar(scroller: HTMLElement, thumb: HTMLElement) {
+  const update = () => {
+    const { scrollHeight: total, clientHeight: view, scrollTop: top } = scroller;
+    thumb.hidden = total <= view + 1;
+    if (thumb.hidden) return;
+    const h = Math.max(24, (view / total) * view);
+    thumb.style.height = h + 'px';
+    thumb.style.top = (top / (total - view)) * (view - h) + 'px';
+  };
+  scroller.addEventListener('scroll', update, { passive: true });
+  new ResizeObserver(update).observe(scroller);
+  new MutationObserver(update).observe(scroller, { childList: true });
+  thumb.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const startY = e.clientY, startTop = scroller.scrollTop;
+    const ratio = (scroller.scrollHeight - scroller.clientHeight) / (scroller.clientHeight - thumb.offsetHeight);
+    thumb.classList.add('drag');
+    const move = (ev: MouseEvent) => (scroller.scrollTop = startTop + (ev.clientY - startY) * ratio);
+    const up = () => {
+      thumb.classList.remove('drag');
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  });
 }
