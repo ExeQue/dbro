@@ -26,6 +26,7 @@ export class StructureTab {
   private rows: ColRow[] = [];
   private order: string[] = []; // original order
   private isNew = false;
+  private before: Selection | null = null; // selection to return to when a new table is canceled
   private newName = h('input', { class: 'input', placeholder: 'table_name', 'aria-label': 'New table name' });
 
   get dirty() {
@@ -50,6 +51,7 @@ export class StructureTab {
 
   /** newTable starts an empty definition with an id column. */
   newTable(sel: Selection) {
+    this.before = sel;
     this.sel = { ...sel, kind: 'table', table: undefined };
     this.isNew = true;
     const d = dialect(sel.conn);
@@ -116,7 +118,7 @@ export class StructureTab {
     const dirty = this.ops().length;
     const head = this.isNew
       ? h('div', { class: 'pane-toolbar' }, field('New table', this.newName), h('span', { class: 'spacer' }),
-          h('button', { type: 'button', class: 'btn', onclick: () => this.show(this.sel, true) }, 'Cancel'),
+          h('button', { type: 'button', class: 'btn', onclick: () => this.show(this.before, true) }, 'Cancel'),
           h('button', { type: 'button', class: 'btn primary', onclick: () => this.save() }, 'Preview SQL and create'))
       : h('div', { class: 'pane-toolbar' }, h('b', {}, def.name), def.isView ? h('span', { class: 'muted' }, 'view (read-only)') : null, h('span', { class: 'spacer' }),
           ro ? null : h('button', { type: 'button', class: 'btn', onclick: () => this.addColumn() }, icon('plus'), 'Column'),
