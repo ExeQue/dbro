@@ -377,6 +377,22 @@ func (a *App) Databases(name string) ([]string, error) {
 	return c.Databases(a.ctx)
 }
 
+// DatabaseLabels names the lerd site behind each database of a lerd connection.
+func (a *App) DatabaseLabels(name string) map[string]string {
+	out := map[string]string{}
+	c, err := a.m.Find(name)
+	if err != nil || c.Source != "lerd" {
+		return out
+	}
+	svc := strings.TrimPrefix(c.Name, "lerd · ")
+	for k, v := range sources.LerdSiteDatabases() {
+		if s, db, ok := strings.Cut(k, "/"); ok && s == svc {
+			out[db] = v
+		}
+	}
+	return out
+}
+
 // TreeDatabase is a database node's children.
 type TreeDatabase struct {
 	Tables   []db.TableInfo `json:"tables"`

@@ -42,6 +42,10 @@ export function CopyText(arg1) {
   return window['go']['main']['App']['CopyText'](arg1);
 }
 
+export function DatabaseLabels(arg1) {
+  return window['go']['main']['App']['DatabaseLabels'](arg1);
+}
+
 export function DatabaseObjects(arg1, arg2) {
   return window['go']['main']['App']['DatabaseObjects'](arg1, arg2);
 }

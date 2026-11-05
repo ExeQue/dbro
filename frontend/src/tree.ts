@@ -17,6 +17,7 @@ interface ConnNode {
   expanded: boolean;
   loading: boolean;
   databases?: string[];
+  labels?: Record<string, string>;
   dbs: Record<string, DbNode>;
 }
 
@@ -64,6 +65,7 @@ export class Tree {
     this.render();
     try {
       n.databases = await forConn(name, () => Go.Databases(name));
+      n.labels = await Go.DatabaseLabels(name).catch(() => ({}));
       state.open[name] = true;
       const def = connInfo(name)?.database;
       const only = n.databases.length === 1 ? n.databases[0] : def && n.databases.includes(def) ? def : '';
@@ -178,6 +180,7 @@ export class Tree {
           caret: d.loading ? 'spin' : d.expanded ? 'open' : 'closed',
           lead: icon('db'),
           label: dbName,
+          meta: n.labels?.[dbName],
           onToggle: () => this.toggleDb(c.name, dbName),
           onSelect: () => this.select(dsel, dkey),
           menu: () => actions.databaseMenu(c.name, dbName, this),

@@ -198,3 +198,53 @@ func applyEnv(c config.Connection, dir string, env map[string]string) config.Con
 	}
 	return c
 }
+
+func lerdSitesPath() string {
+	if p := os.Getenv("DBRO_LERD_SITES"); p != "" {
+		return p
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".local", "share", "lerd", "sites.yaml")
+}
+
+// LerdSiteDatabases maps "<lerd service>/<database>" to the lerd site that uses it,
+// read from each site's .env. Testing databases (<db>_testing) are labeled too.
+func LerdSiteDatabases() map[string]string {
+	out := map[string]string{}
+	b, err := os.ReadFile(lerdSitesPath())
+	if err != nil {
+		return out
+	}
+	var f struct {
+		Sites []struct {
+			Name string `yaml:"name"`
+			Path string `yaml:"path"`
+		} `yaml:"sites"`
+	}
+	if yaml.Unmarshal(b, &f) != nil {
+		return out
+	}
+	for _, s := range f.Sites {
+		env, err := godotenv.Read(filepath.Join(s.Path, ".env"))
+		if err != nil {
+			continue
+		}
+		if over, err := godotenv.Read(filepath.Join(s.Path, ".env.lerd_override")); err == nil {
+			for k, v := range over {
+				env[k] = v
+			}
+		}
+		svc, ok := strings.CutPrefix(env["DB_HOST"], "lerd-")
+		dbName := env["DB_DATABASE"]
+		if !ok || dbName == "" {
+			continue
+		}
+		if _, taken := out[svc+"/"+dbName]; !taken {
+			out[svc+"/"+dbName] = s.Name
+		}
+		if _, taken := out[svc+"/"+dbName+"_testing"]; !taken {
+			out[svc+"/"+dbName+"_testing"] = s.Name + " (testing)"
+		}
+	}
+	return out
+}

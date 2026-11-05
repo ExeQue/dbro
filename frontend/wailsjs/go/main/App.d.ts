@@ -26,6 +26,8 @@ export function Connect(arg1:string):Promise<void>;
 
 export function CopyText(arg1:string):Promise<void>;
 
+export function DatabaseLabels(arg1:string):Promise<Record<string, string>>;
+
 export function DatabaseObjects(arg1:string,arg2:string):Promise<main.TreeDatabase>;
 
 export function Databases(arg1:string):Promise<Array<string>>;

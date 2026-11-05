@@ -39,3 +39,16 @@ func TestLaravelEnv(t *testing.T) {
 		t.Fatalf("missing password must stay empty: %+v", c)
 	}
 }
+
+func TestLerdSiteDatabases(t *testing.T) {
+	dir := t.TempDir()
+	site := filepath.Join(dir, "shop")
+	os.MkdirAll(site, 0o755)
+	os.WriteFile(filepath.Join(site, ".env"), []byte("DB_HOST=lerd-mysql\nDB_DATABASE=shop\n"), 0o600)
+	os.WriteFile(filepath.Join(dir, "sites.yaml"), []byte("sites:\n  - name: shop\n    path: "+site+"\n  - name: gone\n    path: /nope\n"), 0o600)
+	t.Setenv("DBRO_LERD_SITES", filepath.Join(dir, "sites.yaml"))
+	m := LerdSiteDatabases()
+	if m["mysql/shop"] != "shop" || m["mysql/shop_testing"] != "shop (testing)" || len(m) != 2 {
+		t.Fatalf("%v", m)
+	}
+}
