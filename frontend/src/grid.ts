@@ -35,6 +35,8 @@ export interface GridOptions {
   onFilter?: (col: string, op: '=' | '<>' | 'IS NULL' | 'IS NOT NULL', value: unknown) => void;
   /** onSelect reports how many rows are selected */
   onSelect?: (count: number) => void;
+  /** widthKey remembers column widths under this key (per table) */
+  widthKey?: string;
   onChange?: () => void;
   /** full column types and nullability from the table definition (better than driver type names) */
   colTypes?: Record<string, string>;
@@ -63,9 +65,13 @@ export class Grid {
   private table!: HTMLTableElement;
   private editing: HTMLInputElement | null = null;
   private sideEditor: ValueEditor | null = null;
+  private widthStyle = document.createElement('style');
+  private gridId = 'g' + Math.random().toString(36).slice(2, 8);
+  private widths: Record<string, number> = {};
 
   constructor(public opt: GridOptions = {}) {
-    this.el.append(h('div', { class: 'split-h' }, this.scroll, this.side));
+    this.el.append(h('div', { class: 'split-h' }, this.scroll, this.side), this.widthStyle);
+    this.el.classList.add(this.gridId);
     this.scroll.addEventListener('keydown', (e) => this.onKey(e));
     this.scroll.addEventListener('copy', (e) => {
       if (this.editing) return;
@@ -76,6 +82,14 @@ export class Grid {
 
   set(columns: string[], types: string[], rows: unknown[][]) {
     this.columns = columns ?? [];
+    if (this.opt.widthKey) {
+      try {
+        this.widths = JSON.parse(localStorage.getItem('dbro.widths.' + this.opt.widthKey) ?? '{}');
+      } catch {
+        this.widths = {};
+      }
+    }
+    this.applyWidths(false);
     this.types = types ?? [];
     this.rows = rows ?? [];
     this.edits.clear();
@@ -85,6 +99,41 @@ export class Grid {
     this.cur = { r: -1, c: -1 };
     this.side.hidden = true;
     this.render();
+  }
+
+  private startResize(e: MouseEvent, col: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    const th = (e.target as HTMLElement).closest('th')!;
+    const startX = e.clientX, startW = th.getBoundingClientRect().width;
+    document.body.classList.add('resizing');
+    const move = (ev: MouseEvent) => {
+      this.widths[col] = Math.max(40, Math.round(startW + ev.clientX - startX));
+      this.applyWidths(false);
+    };
+    const up = () => {
+      document.body.classList.remove('resizing');
+      document.removeEventListener('mousemove', move);
+      document.removeEventListener('mouseup', up);
+      this.applyWidths(true);
+    };
+    document.addEventListener('mousemove', move);
+    document.addEventListener('mouseup', up);
+  }
+
+  /** applyWidths writes one CSS rule per resized column (n-th child, after the row number). */
+  private applyWidths(save: boolean) {
+    this.widthStyle.textContent = Object.entries(this.widths).map(([col, w]) => {
+      const n = this.columns.indexOf(col) + 2;
+      return n < 2 ? '' : `.${this.gridId} table.grid tr > :nth-child(${n}) { width: ${w}px; min-width: ${w}px; max-width: ${w}px; }`;
+    }).join('\n');
+    if (save && this.opt.widthKey) {
+      try {
+        localStorage.setItem('dbro.widths.' + this.opt.widthKey, JSON.stringify(this.widths));
+      } catch {
+        // widths are a convenience only
+      }
+    }
   }
 
   get rowCount() {
@@ -124,7 +173,12 @@ export class Grid {
           }
           menu(e.clientX, e.clientY, items);
         },
-      }, c, mark, this.types[i] ? h('span', { class: 'type' }, this.types[i]) : null);
+      }, c, mark, this.types[i] ? h('span', { class: 'type' }, this.types[i]) : null,
+        h('span', { class: 'col-resize', title: 'Drag to resize, double-click to reset', onmousedown: (e: MouseEvent) => this.startResize(e, c), ondblclick: (e: MouseEvent) => {
+          e.stopPropagation();
+          delete this.widths[c];
+          this.applyWidths(true);
+        }, onclick: (e: MouseEvent) => e.stopPropagation() }));
     }));
     const body = h('tbody');
     const frag = document.createDocumentFragment();

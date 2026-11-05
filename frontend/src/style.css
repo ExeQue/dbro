@@ -131,6 +131,9 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .grid-scroll { flex: 1; min-height: 0; overflow: auto; position: relative; }
 table.grid { border-collapse: separate; border-spacing: 0; font-size: 12.5px; }
 table.grid th, table.grid td { padding: 3px 10px; border-right: 1px solid var(--border); border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); white-space: nowrap; max-width: 420px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+table.grid th .col-resize { position: absolute; top: 0; right: -3px; width: 7px; height: 100%; cursor: col-resize; z-index: 2; }
+table.grid th .col-resize:hover { background: var(--accent); opacity: 0.5; }
+body.resizing, body.resizing * { cursor: col-resize !important; user-select: none; }
 table.grid th { position: sticky; top: 0; z-index: 1; background: var(--lighter-background); font-weight: 600; cursor: pointer; }
 table.grid th .type { display: block; font-weight: 400; font-size: 10.5px; color: var(--dark-foreground); }
 table.grid th .sort { color: var(--accent); margin-left: 4px; }

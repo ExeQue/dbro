@@ -89,6 +89,7 @@ export class DataTab {
     this.grid = new Grid({
       editable: !isView,
       table: sel.table,
+      widthKey: `${sel.conn}/${sel.db}/${sel.schema ?? ''}/${sel.table}`,
       quote: q,
       onSortSet: (keys) => {
         this.sort = keys;
