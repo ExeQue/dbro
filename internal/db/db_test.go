@@ -253,3 +253,23 @@ func TestSQLiteRebuildKeepsUnique(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestCloneSQLiteToMySQL(t *testing.T) {
+	dst, name := lerdConn(t, "mysql", 3307, "root")
+	src := openSQLite(t)
+	ctx := context.Background()
+	p, _ := src.pool("main")
+	if _, err := p.Exec(`CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, status TEXT DEFAULT 'pending', meta TEXT);
+		CREATE TABLE orders (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id), total NUMERIC DEFAULT 0);
+		INSERT INTO users (email, meta) VALUES ('a@example.com', '{"x":1}'); INSERT INTO orders (user_id, total) VALUES (1, 12.5);`); err != nil {
+		t.Fatal(err)
+	}
+	tables, _ := src.Tables(ctx, "main")
+	if err := Clone(ctx, src, "main", tables, dst, name, "", CloneOptions{WithData: true}, nil); err != nil {
+		t.Fatal(err)
+	}
+	res, _, err := dst.Browse(ctx, name, "", "users", "", "id", false, 0, 10)
+	if err != nil || len(res.Rows) != 1 || res.Rows[0][2] != "pending" {
+		t.Fatalf("%v %v", res.Rows, err)
+	}
+}

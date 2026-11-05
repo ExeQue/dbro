@@ -22,13 +22,28 @@ func MapTableDef(def TableDef, from, to string) TableDef {
 			indexed[c] = true
 		}
 	}
+	pk := map[string]bool{}
+	for _, c := range def.PrimaryKey() {
+		pk[c] = true
+	}
 	for i, col := range def.Columns {
-		col.Type = MapType(col.Type, from, to)
-		if to == "mysql" && indexed[col.Name] && (col.Type == "text" || col.Type == "longtext") {
-			col.Type = "varchar(255)"
+		if pk[col.Name] {
+			col.Nullable = false // SQLite reports INTEGER PRIMARY KEY as nullable
 		}
+		col.Type = MapType(col.Type, from, to)
 		if from != to {
 			col.Default = mapDefault(col.Default)
+		}
+		if to == "mysql" {
+			// MySQL cannot index or default TEXT columns; BLOB and JSON take no literal default either.
+			switch col.Type {
+			case "text", "longtext":
+				if indexed[col.Name] || col.Default != nil {
+					col.Type = "varchar(255)"
+				}
+			case "json", "longblob":
+				col.Default = nil
+			}
 		}
 		if to == "sqlite" && col.AutoIncrement {
 			col.Type = "INTEGER"
