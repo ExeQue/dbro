@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=dbro
+GenericName=SQL Browser
+Comment=Your database bro. Browse MySQL, MariaDB, PostgreSQL and SQLite.
+Exec=dbro
+Icon=dbro
+Terminal=false
+Categories=Development;Database;
+Keywords=sql;database;mysql;mariadb;postgres;sqlite;
+StartupWMClass=dbro
