@@ -23,6 +23,7 @@ export class DataTab {
   private total = 0;
   private pending = h('div', { class: 'pending-bar', hidden: true });
   private info = h('span', { class: 'pager' });
+  private selInfo = h('span', { class: 'muted' });
   private whereEditor = whereField(() => this.applyFilter());
   private whereInput = this.whereEditor.proxy;
   private quickInput = h('input', { class: 'input', type: 'search', style: { flex: '1 1 180px' }, placeholder: 'Quick filter: search all columns', 'aria-label': 'Quick filter across all columns', spellcheck: 'false' });
@@ -95,6 +96,15 @@ export class DataTab {
         this.load();
       },
       onFollow: (fk, values) => actions.followForeignKey(sel, fk, values),
+      onFilter: (col, op, value) => {
+        const cond = op === 'IS NULL' || op === 'IS NOT NULL' ? `${q(col)} ${op}` : `${q(col)} ${op} ${typeof value === 'number' ? value : "'" + String(value).replace(/'/g, "''") + "'"}`;
+        const cur = this.whereInput.value.trim();
+        this.whereInput.value = cur ? `${cur}\n  AND ${cond}` : cond;
+        this.applyFilter();
+      },
+      onSelect: (n) => {
+        this.selInfo.textContent = n > 1 ? `· ${n} selected` : '';
+      },
       onChange: () => this.updatePending(),
     });
     const filters = h('div', { class: 'pane-toolbar filter-bar' },
@@ -111,6 +121,7 @@ export class DataTab {
     const toolbar = h('div', { class: 'pane-toolbar' },
       this.sortBtn,
       this.info,
+      this.selInfo,
       h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Previous page', onclick: () => this.page(-1) }, '‹'),
       h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Next page', onclick: () => this.page(1) }, '›'),
       dropdown('Copy as', () => [
@@ -192,6 +203,12 @@ export class DataTab {
     if (next < 0 || next >= this.total) return;
     this.offset = next;
     this.load();
+  }
+
+  /** focusFilter puts the cursor in the quick filter (Ctrl+F). */
+  focusFilter() {
+    this.quickInput.focus();
+    this.quickInput.select();
   }
 
   /** filterBy shows rows matching column values (follow foreign key). */

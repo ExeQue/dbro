@@ -29,6 +29,10 @@ export interface GridOptions {
   /** onSort is called on a header click; add is true with Ctrl or Shift held (secondary sort). */
   onSort?: (col: string, add: boolean) => void;
   onFollow?: (fk: db.ForeignKey, values: unknown[]) => void;
+  /** onFilter adds a condition for a cell's value to the table filter */
+  onFilter?: (col: string, op: '=' | '<>' | 'IS NULL' | 'IS NOT NULL', value: unknown) => void;
+  /** onSelect reports how many rows are selected */
+  onSelect?: (count: number) => void;
   onChange?: () => void;
   /** full column types and nullability from the table definition (better than driver type names) */
   colTypes?: Record<string, string>;
@@ -182,6 +186,7 @@ export class Grid {
     }
     const prev = this.cur;
     this.cur = { r, c };
+    this.opt.onSelect?.(this.selected.size);
     // cheap update instead of a full render
     this.table.querySelectorAll('tr.selected').forEach((tr) => tr.classList.remove('selected'));
     for (const i of this.selected) this.rowEl(i)?.classList.add('selected');
@@ -452,6 +457,14 @@ export class Grid {
       { label: 'Open in side editor', action: () => this.openSide() },
     ];
     if (fk && this.opt.onFollow) items.push({ label: `Follow ${fk.refTable}`, action: () => this.opt.onFollow!(fk, fk.columns.map((fc) => this.value(r, this.columns.indexOf(fc)))) });
+    if (this.opt.onFilter && r >= 0 && c >= 0) {
+      const v = this.value(r, c);
+      const shown = v === null || v === undefined ? 'NULL' : String(v).length > 30 ? String(v).slice(0, 30) + '…' : String(v);
+      const f = this.opt.onFilter;
+      items.push({ label: 'Filter', items: v === null || v === undefined
+        ? [{ label: `${col} IS NULL`, action: () => f(col, 'IS NULL', null) }, { label: `${col} IS NOT NULL`, action: () => f(col, 'IS NOT NULL', null) }]
+        : [{ label: `${col} = ${shown}`, action: () => f(col, '=', v) }, { label: `${col} ≠ ${shown}`, action: () => f(col, '<>', v) }, { label: `${col} IS NULL`, action: () => f(col, 'IS NULL', null) }] });
+    }
     if (this.opt.editable) {
       items.push(
         { separator: true, label: '' },

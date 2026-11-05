@@ -224,6 +224,12 @@ document.addEventListener('keydown', async (e) => {
         closeQuery(active);
       }
       return;
+    case 'Ctrl+f':
+      if (active === 'data' && state.selection?.table) {
+        e.preventDefault();
+        data.focusFilter();
+      }
+      return;
     case 'Ctrl+s':
       e.preventDefault();
       if (active === 'data') return data.save();
