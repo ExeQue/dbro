@@ -2,6 +2,7 @@
 import { h, clear, cellText, rowsAs, icon } from './util';
 import { menu, toast, type MenuItem } from './dialogs';
 import { Go } from './api';
+import { kindOf, enumValues, pickDate, pickSet, valueEditor, hexDump, type ValueEditor } from './editors';
 import type { db } from '../wailsjs/go/models';
 
 export interface SortKey {
@@ -29,6 +30,9 @@ export interface GridOptions {
   onSort?: (col: string, add: boolean) => void;
   onFollow?: (fk: db.ForeignKey, values: unknown[]) => void;
   onChange?: () => void;
+  /** full column types and nullability from the table definition (better than driver type names) */
+  colTypes?: Record<string, string>;
+  nullable?: Record<string, boolean>;
 }
 
 interface Edit {
@@ -52,6 +56,7 @@ export class Grid {
   private anchor = -1;
   private table!: HTMLTableElement;
   private editing: HTMLInputElement | null = null;
+  private sideEditor: ValueEditor | null = null;
 
   constructor(public opt: GridOptions = {}) {
     this.el.append(h('div', { class: 'split-h' }, this.scroll, this.side));
@@ -233,6 +238,14 @@ export class Grid {
     }
   }
 
+  private colType(c: number): string {
+    return this.opt.colTypes?.[this.columns[c]] ?? this.types[c] ?? '';
+  }
+
+  private isNullable(c: number): boolean {
+    return this.opt.nullable?.[this.columns[c]] ?? true;
+  }
+
   private startEdit(initial?: string) {
     const { r, c } = this.cur;
     if (!this.opt.editable || r < 0 || this.deleted.has(r)) return;
@@ -240,15 +253,69 @@ export class Grid {
     if (!td) return;
     const v = this.value(r, c);
     const s = v === null || v === undefined ? '' : String(v);
-    if (s.includes('\n') || s.length > 200) return this.openSide();
-    const input = h('input', { value: initial ?? s, 'aria-label': this.columns[c] });
+    const type = this.colType(c);
+    let kind = kindOf(type);
+    // SQLite stores dates as TEXT: offer the date picker when the value looks like one
+    const dateLike = /^(\d{4}-\d{2}-\d{2})( \d{2}:\d{2}(:\d{2})?)?$/.exec(s);
+    if (kind === 'text' && dateLike) kind = dateLike[2] ? 'datetime' : 'date';
+    if (kind === 'text' && /^\s*[[{]/.test(s)) {
+      try { JSON.parse(s); kind = 'json'; } catch { /* plain text */ }
+    }
+    const nullable = this.isNullable(c);
+    const finish = (nv: string | null | undefined) => {
+      if (nv !== undefined && nv !== (v ?? null)) this.setValue(r, c, nv);
+      this.scroll.focus();
+    };
+    if (kind === 'blob' || kind === 'json' || s.includes('\n') || s.length > 200) return this.openSide();
+    if (kind === 'date' || kind === 'datetime' || kind === 'time') {
+      pickDate(td, v === null || v === undefined ? null : s, kind, nullable).then(finish);
+      return;
+    }
+    if (kind === 'set') {
+      pickSet(td, v === null || v === undefined ? null : s, enumValues(type), nullable).then(finish);
+      return;
+    }
+    if (kind === 'bool' || kind === 'enum') {
+      const boolText = typeof v === 'boolean' || /bool/i.test(type);
+      const options = kind === 'enum' ? enumValues(type) : boolText ? ['true', 'false'] : ['1', '0'];
+      const NULL = '\u0000null';
+      const sel = h('select', { 'aria-label': this.columns[c] },
+        nullable ? h('option', { value: NULL, selected: v === null || v === undefined }, 'NULL') : null,
+        options.map((o) => h('option', { value: o, selected: s === o || (boolText && String(v) === o) }, o)));
+      td.classList.add('editing');
+      clear(td, sel);
+      this.editing = sel as unknown as HTMLInputElement;
+      sel.focus();
+      const done = (commit: boolean) => {
+        if (this.editing !== (sel as unknown as HTMLInputElement)) return;
+        this.editing = null;
+        if (commit) finish(sel.value === NULL ? null : sel.value);
+        this.refreshCell(r, c);
+      };
+      sel.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') { e.preventDefault(); done(true); this.setCursor(r + 1, c); }
+        else if (e.key === 'Escape') { e.preventDefault(); done(false); this.scroll.focus(); }
+      });
+      sel.addEventListener('change', () => done(true));
+      sel.addEventListener('blur', () => done(false));
+      return;
+    }
+    const input = h('input', { value: initial ?? s, 'aria-label': this.columns[c], inputmode: kind === 'number' ? 'decimal' : undefined });
     td.classList.add('editing');
     clear(td, input);
     this.editing = input;
     input.focus();
     if (initial === undefined) input.select();
+    const valid = () => kind !== 'number' || input.value.trim() === '' || /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/.test(input.value.trim());
+    input.addEventListener('input', () => input.classList.toggle('invalid', !valid()));
     input.addEventListener('keydown', (e) => {
       e.stopPropagation();
+      if ((e.key === 'Enter' || e.key === 'Tab') && !valid()) {
+        e.preventDefault();
+        toast(`${this.columns[c]} needs a number`, 'error');
+        return;
+      }
       if (e.key === 'Enter') {
         e.preventDefault();
         this.commitEdit();
@@ -262,7 +329,7 @@ export class Grid {
         this.setCursor(r, c + (e.shiftKey ? -1 : 1));
       }
     });
-    input.addEventListener('blur', () => this.editing === input && this.commitEdit());
+    input.addEventListener('blur', () => this.editing === input && (valid() ? this.commitEdit() : this.cancelEdit()));
   }
 
   private commitEdit() {
@@ -397,27 +464,63 @@ export class Grid {
     return items;
   }
 
-  /** openSide shows the current cell in a larger editor (JSON and long text). */
+  /** openSide shows the current cell in a larger editor: CodeMirror for JSON and text, a hex dump for binary. */
   openSide() {
     const { r, c } = this.cur;
     if (r < 0 || c < 0) return;
+    this.sideEditor?.destroy();
+    this.sideEditor = null;
     const v = this.value(r, c);
-    const ta = h('textarea', { class: 'input', readOnly: !this.opt.editable, spellcheck: 'false', 'aria-label': 'Value of ' + this.columns[c] });
-    ta.value = v === null || v === undefined ? '' : String(v);
-    const isJSON = /^\s*[[{]/.test(ta.value);
-    const apply = () => this.setValue(r, c, ta.value);
+    const text = v === null || v === undefined ? '' : String(v);
+    let kind = kindOf(this.colType(c));
+    if (kind === 'text' && /^\s*[[{]/.test(text)) {
+      try { JSON.parse(text); kind = 'json'; } catch { /* plain text that starts with a bracket */ }
+    }
+    const editable = !!this.opt.editable && kind !== 'blob';
+    const status = h('span', { class: 'muted' });
+    const applyBtn = editable ? h('button', { type: 'button', class: 'btn small primary', onclick: () => apply() }, 'Apply') : null;
+    let ed: ValueEditor | null = null;
+    const refresh = () => {
+      if (!ed) return;
+      const err = ed.error();
+      const len = ed.get().length;
+      status.textContent = err ? 'Invalid JSON: ' + err : `${len.toLocaleString('en-US')} characters`;
+      status.style.color = err ? 'var(--red)' : '';
+      if (applyBtn) applyBtn.disabled = !!err;
+    };
+    const apply = () => {
+      if (!ed || ed.error()) return;
+      this.setValue(r, c, ed.get());
+    };
+    let body: HTMLElement;
+    if (kind === 'blob') {
+      body = h('pre', { class: 'hex-dump' }, text ? hexDump(text) : 'NULL');
+    } else {
+      ed = valueEditor(kind === 'json' && text ? prettyJSON(text) : text, kind, !editable, refresh);
+      this.sideEditor = ed;
+      body = ed.el;
+    }
     clear(this.side,
-      h('div', { class: 'pane-toolbar' }, h('b', {}, this.columns[c]), h('span', { class: 'spacer' }),
-        h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Close side editor', onclick: () => { this.side.hidden = true; } }, icon('x'))),
-      ta,
+      h('div', { class: 'pane-toolbar' }, h('b', {}, this.columns[c]), h('span', { class: 'muted' }, this.colType(c) || kind), h('span', { class: 'spacer' }),
+        h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Close side editor', onclick: () => { this.side.hidden = true; this.sideEditor?.destroy(); this.sideEditor = null; } }, icon('x'))),
+      body,
       h('div', { class: 'pane-toolbar' },
-        isJSON ? h('button', { type: 'button', class: 'btn small', onclick: () => {
-          try { ta.value = JSON.stringify(JSON.parse(ta.value), null, 2); } catch { toast('Not valid JSON', 'error'); }
-        } }, 'Format JSON') : null,
-        this.opt.editable ? h('button', { type: 'button', class: 'btn small', onclick: () => this.setValue(r, c, null) }, 'Set NULL') : null,
+        kind === 'json' && ed ? h('button', { type: 'button', class: 'btn small', onclick: () => { try { ed!.set(JSON.stringify(JSON.parse(ed!.get()), null, 2)); } catch { toast('Not valid JSON', 'error'); } } }, 'Format') : null,
+        kind === 'json' && ed ? h('button', { type: 'button', class: 'btn small', onclick: () => { try { ed!.set(JSON.stringify(JSON.parse(ed!.get()))); } catch { toast('Not valid JSON', 'error'); } } }, 'Minify') : null,
+        editable && this.isNullable(c) ? h('button', { type: 'button', class: 'btn small', onclick: () => this.setValue(r, c, null) }, 'Set NULL') : null,
+        status,
         h('span', { class: 'spacer' }),
-        this.opt.editable ? h('button', { type: 'button', class: 'btn small primary', onclick: apply }, 'Apply') : null),
+        applyBtn),
     );
     this.side.hidden = false;
+    refresh();
+  }
+}
+
+function prettyJSON(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
   }
 }

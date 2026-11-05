@@ -3,8 +3,9 @@ import { EditorView, keymap, placeholder } from '@codemirror/view';
 import { EditorState, Compartment, Prec } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { sql, MySQL, PostgreSQL, SQLite, MariaSQL } from '@codemirror/lang-sql';
-import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
-import { tags as t } from '@lezer/highlight';
+import { syntaxHighlighting } from '@codemirror/language';
+import { highlight } from './highlight';
+import { prettify, minify } from './sqlformat';
 import { h, clear, icon, nextId, formatCount } from './util';
 import { Go, forConn } from './api';
 import { Grid, nextSort } from './grid';
@@ -12,15 +13,7 @@ import { dropdown, toast, prompt, modal, errorMessage, type MenuItem } from './d
 import { connInfo, dialect, quoteIdent, type Selection } from './state';
 import type { db } from '../wailsjs/go/models';
 
-const highlight = HighlightStyle.define([
-  { tag: [t.keyword, t.operatorKeyword, t.modifier], color: 'var(--magenta)', fontWeight: '600' },
-  { tag: [t.string, t.special(t.string)], color: 'var(--green)' },
-  { tag: [t.number, t.bool, t.null], color: 'var(--orange)' },
-  { tag: [t.function(t.variableName), t.standard(t.name), t.typeName], color: 'var(--cyan)' },
-  { tag: [t.comment, t.lineComment, t.blockComment], color: 'var(--dark-foreground)', fontStyle: 'italic' },
-  { tag: [t.special(t.name), t.quote], color: 'var(--yellow)' },
-  { tag: t.punctuation, color: 'var(--light-foreground)' },
-]);
+
 
 export class QueryTab {
   id = nextId('q');
@@ -50,6 +43,7 @@ export class QueryTab {
           Prec.highest(keymap.of([
             { key: 'Mod-Enter', run: () => (this.run(), true) },
             { key: 'Shift-Mod-Enter', run: () => (this.explain(), true) },
+            { key: 'Shift-Mod-f', run: () => (this.reformat(false), true) },
           ])),
           basicSetup,
           this.lang.of(sql()),
@@ -65,6 +59,8 @@ export class QueryTab {
     this.el.append(
       h('div', { class: 'pane-toolbar' }, this.runBtn, this.stopBtn,
         h('button', { type: 'button', class: 'btn', onclick: () => this.explain() }, 'Explain'),
+        h('button', { type: 'button', class: 'btn', title: 'Prettify (Ctrl+Shift+F)', onclick: () => this.reformat(false) }, 'Prettify'),
+        h('button', { type: 'button', class: 'btn', title: 'Minify', onclick: () => this.reformat(true) }, 'Minify'),
         h('button', { type: 'button', class: 'btn', onclick: () => this.showHistory() }, icon('history', 12), 'History'),
         dropdown('Snippets', () => this.snippetMenu()),
         h('span', { class: 'spacer' }), this.target),
@@ -101,6 +97,20 @@ export class QueryTab {
   private text() {
     const s = this.view.state.selection.main;
     return s.empty ? this.view.state.doc.toString() : this.view.state.sliceDoc(s.from, s.to);
+  }
+
+  /** reformat prettifies or minifies the selection, or everything when nothing is selected. */
+  private reformat(min: boolean) {
+    const sel = this.view.state.selection.main;
+    const from = sel.empty ? 0 : sel.from, to = sel.empty ? this.view.state.doc.length : sel.to;
+    const text = this.view.state.sliceDoc(from, to);
+    if (!text.trim()) return;
+    try {
+      const out = min ? minify(text) : prettify(text, this.conn ? dialect(this.conn) : 'mysql');
+      this.view.dispatch({ changes: { from, to, insert: out } });
+    } catch (e) {
+      toast('Could not format: ' + errorMessage(e), 'error');
+    }
   }
 
   setText(text: string) {

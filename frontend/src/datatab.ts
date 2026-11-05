@@ -7,6 +7,7 @@ import { dropdown, toast, errorMessage, confirm, showError, modal } from './dial
 import { state, connInfo, quoteIdent, dialect, type Selection } from './state';
 import * as actions from './actions';
 import { logo } from './logo';
+import { whereField } from './wherefield';
 import type { db } from '../wailsjs/go/models';
 
 const PAGE = 1000;
@@ -22,15 +23,13 @@ export class DataTab {
   private total = 0;
   private pending = h('div', { class: 'pending-bar', hidden: true });
   private info = h('span', { class: 'pager' });
-  private whereInput = h('input', { class: 'input', style: { flex: '3 1 260px' }, placeholder: "WHERE …  e.g. email LIKE '%@example.com'", 'aria-label': 'Filter rows (WHERE clause)', spellcheck: 'false' });
+  private whereEditor = whereField(() => this.applyFilter());
+  private whereInput = this.whereEditor.proxy;
   private quickInput = h('input', { class: 'input', type: 'search', style: { flex: '1 1 180px' }, placeholder: 'Quick filter: search all columns', 'aria-label': 'Quick filter across all columns', spellcheck: 'false' });
   private token = 0;
   private sortBtn: HTMLButtonElement | null = null;
 
   constructor() {
-    this.whereInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') this.applyFilter();
-    });
     const live = debounce(() => this.applyFilter(), 400);
     this.quickInput.addEventListener('input', live);
     this.quickInput.addEventListener('keydown', (e) => {
@@ -100,7 +99,7 @@ export class DataTab {
     });
     const filters = h('div', { class: 'pane-toolbar filter-bar' },
       h('label', { style: { display: 'contents' } }, icon('search'), this.quickInput),
-      h('label', { style: { display: 'contents' } }, h('b', { style: { color: 'var(--magenta)' } }, 'WHERE'), this.whereInput),
+      h('b', { class: 'where-label' }, 'WHERE'), this.whereEditor.el,
       dropdown('Recent', () => {
         const list = recent(sel);
         return list.length ? list.map((w) => ({ label: w.length > 70 ? w.slice(0, 70) + '…' : w, action: () => { this.whereInput.value = w; this.applyFilter(); } })) : [{ label: 'No recent filters', disabled: true }];
@@ -128,6 +127,9 @@ export class DataTab {
     try {
       this.def = await forConn(sel.conn, () => Go.Describe(sel.conn, sel.db!, sel.schema ?? '', sel.table!));
       this.grid.opt.pk = this.def.columns.length ? pkOf(this.def) : [];
+      this.grid.opt.colTypes = Object.fromEntries(this.def.columns.map((c) => [c.name, c.type]));
+      this.grid.opt.nullable = Object.fromEntries(this.def.columns.map((c) => [c.name, c.nullable]));
+      this.whereEditor.setColumns(sel.table!, this.def.columns.map((c) => c.name));
       this.grid.opt.fks = this.def.foreignKeys ?? [];
     } catch (e) {
       toast(errorMessage(e), 'error');

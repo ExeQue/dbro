@@ -134,6 +134,7 @@ table.grid th, table.grid td { padding: 3px 10px; border-right: 1px solid var(--
 table.grid th { position: sticky; top: 0; z-index: 1; background: var(--lighter-background); font-weight: 600; cursor: pointer; }
 table.grid th .type { display: block; font-weight: 400; font-size: 10.5px; color: var(--dark-foreground); }
 table.grid th .sort { color: var(--accent); margin-left: 4px; }
+table.grid tr td.rownum, table.grid tr:nth-child(even) td.rownum, table.grid tr.selected td.rownum { background: var(--dark-background); }
 table.grid th.rownum, table.grid td.rownum { position: sticky; left: 0; background: var(--dark-background); color: var(--dark-foreground); text-align: right; min-width: 44px; cursor: default; z-index: 1; }
 table.grid th.rownum { z-index: 2; }
 table.grid tr:nth-child(even) td { background: var(--row-alt); }
@@ -259,3 +260,34 @@ legend { color: var(--light-foreground); padding: 0 4px; }
   .sidebar { width: 38vw; }
   .tab { padding: 0 8px; }
 }
+
+/* ---- filter field and cell editors ---- */
+.filter-bar { align-items: flex-start; }
+.where-label { color: var(--magenta); padding-top: 6px; }
+.where-field { flex: 3 1 320px; min-width: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--background); resize: vertical; overflow: auto; min-height: 30px; max-height: 40vh; }
+.where-field:focus-within { border-color: var(--accent); }
+.where-field .cm-editor { background: transparent; color: var(--foreground); font-size: 12.5px; }
+.where-field .cm-editor.cm-focused { outline: none; }
+.where-field .cm-content { padding: 4px 6px; }
+.where-field .cm-placeholder { color: var(--dark-foreground); }
+.popover { position: fixed; z-index: 65; padding: 10px; background: var(--lighter-background); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.35); display: grid; gap: 8px; min-width: 240px; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 30px); gap: 2px; justify-content: center; }
+.cal-dow { text-align: center; color: var(--dark-foreground); font-size: 11px; }
+.cal-day { height: 26px; border: 0; border-radius: 5px; background: transparent; cursor: pointer; }
+.cal-day:hover { background: var(--hover); }
+.cal-day.on { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.cal-time { display: flex; align-items: center; gap: 4px; justify-content: center; }
+.cal-time .input { width: 58px; text-align: center; }
+.cal-actions { display: flex; gap: 6px; align-items: center; }
+.set-picker label { display: flex; }
+table.grid td.editing select { width: 100%; min-width: 120px; height: 100%; padding: 2px 6px; border: 0; outline: 2px solid var(--accent); outline-offset: -2px; background: var(--background); }
+table.grid td.editing input.invalid { outline-color: var(--red); }
+.side-editor { width: 440px; }
+.value-editor { flex: 1; min-height: 0; overflow: hidden; margin: 6px 8px; border: 1px solid var(--border); border-radius: 6px; }
+.value-editor .cm-editor { height: 100%; background: var(--background); color: var(--foreground); font-size: 12.5px; }
+.value-editor .cm-gutters { background: var(--dark-background); color: var(--dark-foreground); border-right: 1px solid var(--border); }
+.value-editor .cm-editor.cm-focused { outline: none; }
+.hex-dump { flex: 1; margin: 6px 8px; overflow: auto; font-size: 12px; color: var(--light-foreground); user-select: text; -webkit-user-select: text; }
+.cm-lint-marker-error, .cm-diagnostic-error { border-left-color: var(--red) !important; }
+.cm-tooltip-lint { background: var(--lighter-background) !important; color: var(--foreground); }
