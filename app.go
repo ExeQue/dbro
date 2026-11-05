@@ -167,7 +167,7 @@ func (a *App) AnswerOmarchy(sync bool) (theme.Theme, error) {
 // ListThemes returns every theme.
 func (a *App) ListThemes() []theme.Info { return theme.List() }
 
-// SaveThemeAs copies the active theme's colours into a custom theme file.
+// SaveThemeAs copies the active theme's colors into a custom theme file.
 func (a *App) SaveThemeAs(name string, colors map[string]string) (string, error) {
 	return theme.SaveCustom(name, colors)
 }
@@ -479,7 +479,7 @@ func (a *App) RunQuery(name, database, tabID, script string, limit int) (QueryRu
 	if err != nil {
 		run.Error = err.Error()
 		if ctx.Err() != nil {
-			run.Error = "query cancelled"
+			run.Error = "query canceled"
 			c.CloseSession(database, tabID) // the session may still be busy on the server
 		}
 	}
@@ -568,7 +568,7 @@ func filters(format string) []runtime.FileFilter {
 	return []runtime.FileFilter{{DisplayName: strings.ToUpper(format), Pattern: "*." + format}}
 }
 
-// ExportTable asks for a file and writes a table to it. Returns "" when cancelled.
+// ExportTable asks for a file and writes a table to it. Returns "" when canceled.
 func (a *App) ExportTable(name, database, schema, table, where, format string) (string, error) {
 	c, err := a.conn(name)
 	if err != nil {

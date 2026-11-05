@@ -1,4 +1,4 @@
-// Package theme loads dbro's colour themes: built-in ones, the user's own
+// Package theme loads dbro's color themes: built-in ones, the user's own
 // (~/.config/dbro/themes/*.toml) and Omarchy's current theme, all in Omarchy's colors.toml format.
 package theme
 
@@ -24,7 +24,7 @@ import (
 //go:embed builtin/*.toml
 var builtin embed.FS
 
-// Theme maps Omarchy colour keys (accent, background, ...) to values, plus "mode".
+// Theme maps Omarchy color keys (accent, background, ...) to values, plus "mode".
 type Theme struct {
 	ID     string            `json:"id"`
 	Name   string            `json:"name"`
@@ -233,7 +233,7 @@ func SaveCustom(name string, colors map[string]string) (string, error) {
 	return id, os.WriteFile(filepath.Join(CustomDir(), id+".toml"), []byte(b.String()), 0o644)
 }
 
-// SystemPrefersLight asks the XDG desktop portal for the colour-scheme preference
+// SystemPrefersLight asks the XDG desktop portal for the color-scheme preference
 // (0 none, 1 dark, 2 light).
 func SystemPrefersLight() bool {
 	if v := os.Getenv("DBRO_COLOR_SCHEME"); v != "" {
@@ -260,7 +260,7 @@ func SystemPrefersLight() bool {
 }
 
 // Watch calls onChange whenever the theme behind id changes on disk
-// (or the system colour scheme changes, for "system"), until ctx ends.
+// (or the system color scheme changes, for "system"), until ctx ends.
 func Watch(ctx context.Context, id string, onChange func(Theme)) error {
 	var dirs []string
 	switch id {

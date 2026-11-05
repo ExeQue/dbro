@@ -1,4 +1,4 @@
-// Applies a theme's Omarchy colour keys as CSS variables.
+// Applies a theme's Omarchy color keys as CSS variables.
 import type { theme } from '../wailsjs/go/models';
 
 let current: theme.Theme | null = null;

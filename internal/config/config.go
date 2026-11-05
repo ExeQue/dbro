@@ -59,7 +59,7 @@ type Settings struct {
 	QueryTimeout int    `toml:"query_timeout,omitempty" json:"queryTimeout"` // seconds
 }
 
-// Dir returns the config directory, honouring DBRO_CONFIG_DIR and XDG_CONFIG_HOME.
+// Dir returns the config directory, honoring DBRO_CONFIG_DIR and XDG_CONFIG_HOME.
 func Dir() string {
 	if d := os.Getenv("DBRO_CONFIG_DIR"); d != "" {
 		return d

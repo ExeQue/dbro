@@ -359,7 +359,7 @@ export async function editConnection(name?: string, duplicate = false) {
   };
 
   const body = h('div', { class: 'form' },
-    h('div', { class: 'form-row' }, field('Name', nameI), field('Colour', colorS, 'Red asks before saving changes.')),
+    h('div', { class: 'form-row' }, field('Name', nameI), field('Color', colorS, 'Red asks before saving changes.')),
     seg, serverBox, sqliteBox, laravelBox, sshField,
     h('fieldset', {}, h('legend', {}, 'Agents (MCP)'),
       h('label', { class: 'check' }, allowWrites, ' Allow agents to change data and schema'),

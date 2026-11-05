@@ -70,7 +70,7 @@ export class Tree {
       if (only) await this.toggleDb(name, only, true);
     } catch (e) {
       n.expanded = false;
-      if (errorMessage(e) !== 'Cancelled') toast(`${name}: ${errorMessage(e)}`, 'error');
+      if (errorMessage(e) !== 'Canceled') toast(`${name}: ${errorMessage(e)}`, 'error');
     } finally {
       n.loading = false;
       this.render();

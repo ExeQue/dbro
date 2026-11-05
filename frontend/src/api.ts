@@ -14,7 +14,7 @@ export async function call<T>(f: () => Promise<T>, attempts = 3): Promise<T> {
     if (attempts > 0 && msg.startsWith('NEED_PASSWORD:')) {
       const info = JSON.parse(msg.slice('NEED_PASSWORD:'.length)) as { conn: string; kind: string; message: string };
       if (await askPassword(info.conn, info.kind, info.message)) return call(f, attempts - 1);
-      throw new Error('Cancelled');
+      throw new Error('Canceled');
     }
     if (attempts > 0 && msg.startsWith('UNKNOWN_HOST:')) {
       const [host, fp] = msg.slice('UNKNOWN_HOST:'.length).split('|');

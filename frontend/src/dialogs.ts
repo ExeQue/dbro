@@ -198,7 +198,7 @@ export function dropdown(label: Node | string, items: () => MenuItem[] | Promise
   return b;
 }
 
-/** field builds a labelled form row. */
+/** field builds a labeled form row. */
 export function field(label: string, control: HTMLElement, hint?: string): HTMLElement {
   return h('label', { class: 'field' }, h('span', {}, label), control, hint ? h('small', { class: 'hint' }, hint) : null);
 }
