@@ -194,6 +194,20 @@ export namespace db {
 	        this.primary = source["primary"];
 	    }
 	}
+	export class InfoItem {
+	    label: string;
+	    value: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new InfoItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.label = source["label"];
+	        this.value = source["value"];
+	    }
+	}
 	export class Result {
 	    sql: string;
 	    columns: string[];

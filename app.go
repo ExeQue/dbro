@@ -785,3 +785,12 @@ func (a *App) saveDialog(o runtime.SaveDialogOptions) (string, error) {
 	}
 	return runtime.SaveFileDialog(a.ctx, o)
 }
+
+// TableInfo returns facts about a table (engine, sizes, auto-increment, ...).
+func (a *App) TableInfo(name, database, schema, table string) ([]db.InfoItem, error) {
+	c, err := a.conn(name)
+	if err != nil {
+		return nil, err
+	}
+	return c.TableInfo(a.ctx, database, schema, table)
+}

@@ -738,3 +738,137 @@ func (c *Conn) Completions(ctx context.Context, database string) (map[string][]s
 	}
 	return out, nil
 }
+
+// InfoItem is one line of table information (HeidiSQL's Options tab).
+type InfoItem struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
+// TableInfo returns engine, sizes, auto-increment and similar facts about a table.
+func (c *Conn) TableInfo(ctx context.Context, database, schema, table string) ([]InfoItem, error) {
+	p, err := c.pool(database)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := p.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	var out []InfoItem
+	add := func(label string, v any) {
+		if s := str(v); s != "" {
+			out = append(out, InfoItem{label, s})
+		}
+	}
+	bytes := func(v any) string {
+		n := i64(v)
+		if n == nil {
+			return ""
+		}
+		units := []string{"B", "KiB", "MiB", "GiB", "TiB"}
+		f, i := float64(*n), 0
+		for f >= 1024 && i < len(units)-1 {
+			f /= 1024
+			i++
+		}
+		if i == 0 {
+			return fmt.Sprintf("%d B", *n)
+		}
+		return fmt.Sprintf("%.1f %s", f, units[i])
+	}
+	switch c.Kind() {
+	case "mysql":
+		// MySQL 8 caches these statistics for a day unless told otherwise; MariaDB has no such variable.
+		conn.ExecContext(ctx, "SET SESSION information_schema_stats_expiry = 0")
+		r, err := c.run(ctx, conn, database, `SELECT ENGINE, TABLE_COLLATION, AUTO_INCREMENT, ROW_FORMAT, TABLE_ROWS, AVG_ROW_LENGTH,
+			DATA_LENGTH, INDEX_LENGTH, DATA_FREE, CREATE_TIME, UPDATE_TIME, TABLE_COMMENT, TABLE_TYPE
+			FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?`, 0, database, table)
+		if err != nil || len(r.Rows) == 0 {
+			return nil, err
+		}
+		v := r.Rows[0]
+		add("Type", v[12])
+		add("Engine", v[0])
+		add("Collation", v[1])
+		add("Auto increment (next)", v[2])
+		add("Row format", v[3])
+		add("Rows (estimate)", v[4])
+		add("Average row length", bytes(v[5]))
+		add("Data size", bytes(v[6]))
+		add("Index size", bytes(v[7]))
+		add("Free space", bytes(v[8]))
+		add("Created", v[9])
+		add("Updated", v[10])
+		add("Comment", v[11])
+	case "postgres":
+		if schema == "" {
+			schema = "public"
+		}
+		r, err := c.run(ctx, conn, database, `SELECT pg_get_userbyid(c.relowner), coalesce(t.spcname, 'default'), c.reltuples::bigint,
+				pg_table_size(c.oid), pg_indexes_size(c.oid), pg_total_relation_size(c.oid),
+				CASE c.relpersistence WHEN 'u' THEN 'unlogged' WHEN 't' THEN 'temporary' ELSE 'permanent' END,
+				obj_description(c.oid, 'pg_class'), s.last_vacuum, s.last_autovacuum, s.last_analyze, s.last_autoanalyze, s.n_live_tup, s.n_dead_tup
+			FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+			LEFT JOIN pg_tablespace t ON t.oid = c.reltablespace
+			LEFT JOIN pg_stat_user_tables s ON s.relid = c.oid
+			WHERE n.nspname = $1 AND c.relname = $2`, 0, schema, table)
+		if err != nil || len(r.Rows) == 0 {
+			return nil, err
+		}
+		v := r.Rows[0]
+		add("Owner", v[0])
+		add("Tablespace", v[1])
+		add("Persistence", v[6])
+		if n := i64(v[2]); n != nil && *n >= 0 {
+			add("Rows (estimate)", *n)
+		}
+		add("Live / dead rows", fmt.Sprintf("%s / %s", str(v[12]), str(v[13])))
+		add("Table size", bytes(v[3]))
+		add("Index size", bytes(v[4]))
+		add("Total size", bytes(v[5]))
+		add("Last vacuum", later(str(v[8]), str(v[9])))
+		add("Last analyze", later(str(v[10]), str(v[11])))
+		add("Comment", v[7])
+		// next value of every serial or identity column
+		seqs, err := c.run(ctx, conn, database, `SELECT a.attname, pg_get_serial_sequence(quote_ident($1) || '.' || quote_ident($2), a.attname)
+			FROM pg_attribute a JOIN pg_class c ON c.oid = a.attrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+			WHERE n.nspname = $1 AND c.relname = $2 AND a.attnum > 0 AND NOT a.attisdropped
+			AND pg_get_serial_sequence(quote_ident($1) || '.' || quote_ident($2), a.attname) IS NOT NULL`, 0, schema, table)
+		if err == nil {
+			for _, s := range seqs.Rows {
+				nv, err := c.run(ctx, conn, database, "SELECT CASE WHEN is_called THEN last_value + 1 ELSE last_value END FROM "+str(s[1]), 0)
+				if err == nil && len(nv.Rows) > 0 {
+					add("Next value of "+str(s[0]), nv.Rows[0][0])
+				}
+			}
+		}
+	case "sqlite":
+		r, err := c.run(ctx, conn, database, "SELECT COUNT(*) FROM "+c.Q(table), 0)
+		if err == nil && len(r.Rows) > 0 {
+			add("Rows", r.Rows[0][0])
+		}
+		if seq, err := c.run(ctx, conn, database, "SELECT seq + 1 FROM sqlite_sequence WHERE name = ?", 0, table); err == nil && len(seq.Rows) > 0 {
+			add("Auto increment (next)", seq.Rows[0][0])
+		}
+		if m, err := c.run(ctx, conn, database, "SELECT type, sql FROM sqlite_master WHERE name = ?", 0, table); err == nil && len(m.Rows) > 0 {
+			up := strings.ToUpper(str(m.Rows[0][1]))
+			add("Type", m.Rows[0][0])
+			add("Without rowid", map[bool]string{true: "yes", false: "no"}[strings.Contains(up, "WITHOUT ROWID")])
+			add("Strict", map[bool]string{true: "yes", false: "no"}[strings.Contains(up, "STRICT")])
+		}
+		if sz, err := c.run(ctx, conn, database, "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()", 0); err == nil && len(sz.Rows) > 0 {
+			add("Database file size", bytes(sz.Rows[0][0]))
+		}
+	}
+	return out, nil
+}
+
+// later returns the later of two timestamps formatted the same way (either may be empty).
+func later(a, b string) string {
+	if a > b {
+		return a
+	}
+	return b
+}

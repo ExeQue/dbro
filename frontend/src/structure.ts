@@ -26,6 +26,7 @@ export class StructureTab {
   private rows: ColRow[] = [];
   private order: string[] = []; // original order
   private isNew = false;
+  private info: db.InfoItem[] = [];
   private before: Selection | null = null; // selection to return to when a new table is canceled
   private newName = h('input', { class: 'input', placeholder: 'table_name', 'aria-label': 'New table name' });
 
@@ -43,6 +44,7 @@ export class StructureTab {
     clear(this.el, h('div', { class: 'empty' }, 'Loading…'));
     try {
       this.def = await forConn(sel.conn, () => Go.Describe(sel.conn, sel.db!, sel.schema ?? '', sel.table!));
+      this.info = await Go.TableInfo(sel.conn, sel.db!, sel.schema ?? '', sel.table!).catch(() => []);
     } catch (e) {
       return clear(this.el, h('div', { class: 'result-error' }, errorMessage(e)));
     }
@@ -127,7 +129,12 @@ export class StructureTab {
           h('button', { type: 'button', class: 'btn', onclick: () => this.showCreate() }, 'Show CREATE'),
           ro ? null : h('button', { type: 'button', class: 'btn', disabled: !dirty, onclick: () => this.reset() }, 'Reset'),
           ro ? null : h('button', { type: 'button', class: 'btn primary', disabled: !dirty, onclick: () => this.save() }, 'Preview SQL and save', h('span', { class: 'shortcut' }, 'Ctrl+S')));
-    const body = h('div', { class: 'structure' }, types, h('h3', {}, 'Columns'), colTable);
+    const infoBlock = !this.isNew && this.info.length
+      ? h('details', { class: 'table-info', open: true },
+          h('summary', {}, 'Table info'),
+          h('dl', {}, this.info.map((it) => h('div', {}, h('dt', {}, it.label), h('dd', {}, it.value)))))
+      : null;
+    const body = h('div', { class: 'structure' }, types, infoBlock, h('h3', {}, 'Columns'), colTable);
     if (this.isNew) {
       body.append(h('p', { class: 'muted' }, 'Add columns, then create. Indexes and foreign keys can be added once the table exists.'), h('button', { type: 'button', class: 'btn', onclick: () => this.addColumn() }, icon('plus'), 'Column'));
     } else {

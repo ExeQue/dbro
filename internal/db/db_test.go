@@ -130,6 +130,17 @@ func exercise(t *testing.T, c *Conn, database, schema string) {
 		t.Fatalf("tables: %v", names)
 	}
 
+	info, err := c.TableInfo(ctx, database, schema, "users")
+	must(err)
+	facts := map[string]string{}
+	for _, it := range info {
+		facts[it.Label] = it.Value
+	}
+	next := facts["Auto increment (next)"] + facts["Next value of id"]
+	if next != "3" {
+		t.Fatalf("next auto increment = %q in %v", next, facts)
+	}
+
 	results, err := c.Query(ctx, database, "tab1", "SELECT COUNT(*) AS n FROM "+c.Table(schema, "users")+"; SELECT 1", 100)
 	must(err)
 	if len(results) != 2 || results[0].Columns[0] != "n" {

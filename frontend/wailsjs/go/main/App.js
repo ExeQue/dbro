@@ -182,6 +182,10 @@ export function Snippets() {
   return window['go']['main']['App']['Snippets']();
 }
 
+export function TableInfo(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['TableInfo'](arg1, arg2, arg3, arg4);
+}
+
 export function TestConnection(arg1, arg2, arg3) {
   return window['go']['main']['App']['TestConnection'](arg1, arg2, arg3);
 }

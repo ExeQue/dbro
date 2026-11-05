@@ -46,6 +46,11 @@ a { color: var(--accent); }
 .muted { color: var(--dark-foreground); }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 [hidden] { display: none !important; }
+/* thin themed scrollbars that take their own space instead of covering content */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--foreground) 22%, transparent); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--accent) 70%, transparent); border: 2px solid transparent; background-clip: padding-box; }
 
 /* ---- layout ---- */
 #app { height: 100vh; display: flex; flex-direction: column; }
@@ -171,6 +176,11 @@ table.grid td.fk { text-decoration: underline dotted var(--dark-foreground); }
 .sgrid tr.dropped td { opacity: 0.5; text-decoration: line-through; }
 .sgrid .type { color: var(--cyan); }
 .sgrid .key { color: var(--yellow); }
+.table-info { margin: 4px 0 6px; }
+.table-info summary { cursor: pointer; color: var(--light-foreground); font-weight: 600; padding: 4px 0; }
+.table-info dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px 18px; margin: 6px 0 0; }
+.table-info dt { color: var(--dark-foreground); font-size: 11px; }
+.table-info dd { margin: 0; user-select: text; -webkit-user-select: text; }
 .create-sql { margin: 0; padding: 10px; background: var(--dark-background); border: 1px solid var(--border); border-radius: 6px; white-space: pre-wrap; user-select: text; -webkit-user-select: text; }
 
 /* ---- log ---- */
