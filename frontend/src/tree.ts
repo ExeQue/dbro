@@ -18,6 +18,7 @@ interface ConnNode {
   loading: boolean;
   databases?: string[];
   labels?: Record<string, string>;
+  groups: Record<string, boolean>;
   dbs: Record<string, DbNode>;
 }
 
@@ -45,7 +46,7 @@ export class Tree {
   }
 
   private conn(name: string): ConnNode {
-    return (this.nodes[name] ??= { expanded: false, loading: false, dbs: {} });
+    return (this.nodes[name] ??= { expanded: false, loading: false, dbs: {}, groups: {} });
   }
 
   private dbn(conn: string, db: string): DbNode {
@@ -172,11 +173,11 @@ export class Tree {
         menu: () => actions.connectionMenu(c.name, this),
       }));
       if (!n.expanded || !n.databases) continue;
-      for (const dbName of n.databases) {
+      const renderDb = (dbName: string, depth: number) => {
         const d = this.dbn(c.name, dbName);
         const dkey = c.name + '/' + dbName;
         const dsel: Selection = { kind: 'database', conn: c.name, db: dbName };
-        rows.push(this.node(dkey, 1, {
+        rows.push(this.node(dkey, depth, {
           caret: d.loading ? 'spin' : d.expanded ? 'open' : 'closed',
           lead: icon('db'),
           label: dbName,
@@ -185,7 +186,7 @@ export class Tree {
           onSelect: () => this.select(dsel, dkey),
           menu: () => actions.databaseMenu(c.name, dbName, this),
         }));
-        if (!d.expanded || !d.tables) continue;
+        if (!d.expanded || !d.tables) return;
         const match = (s: string) => !filter || s.toLowerCase().includes(filter);
         const tables = d.tables.filter((t) => t.type !== 'view' && match(t.name));
         const views = d.tables.filter((t) => t.type === 'view' && match(t.name));
@@ -194,7 +195,7 @@ export class Tree {
         const group = (id: string, title: string, count: number, items: () => HTMLElement[]) => {
           if (!count && (id !== 'tables' || filter)) return;
           const open = filter ? true : d.groups[id];
-          rows.push(this.node(dkey + '#' + id, 2, {
+          rows.push(this.node(dkey + '#' + id, depth + 1, {
             caret: open ? 'open' : 'closed', cls: 'group', label: title, meta: String(count),
             onToggle: () => { d.groups[id] = !d.groups[id]; this.render(); },
             onSelect: () => { d.groups[id] = !d.groups[id]; this.render(); },
@@ -204,7 +205,7 @@ export class Tree {
         const tableNode = (t: db.TableInfo) => {
           const s: Selection = { kind: t.type === 'view' ? 'view' : 'table', conn: c.name, db: dbName, schema: t.schema, table: t.name };
           const key = this.keyOf(s);
-          return this.node(key, 3, {
+          return this.node(key, depth + 2, {
             lead: icon(t.type === 'view' ? 'view' : 'table'),
             label: multiSchema && t.schema !== 'public' ? `${t.schema}.${t.name}` : t.name,
             meta: t.type === 'view' ? '' : [formatCount(t.rows), formatBytes(t.size)].filter(Boolean).join(' · '),
@@ -217,14 +218,44 @@ export class Tree {
         group('routines', 'Functions, procedures, triggers', routines.length, () => routines.map((r) => {
           const s: Selection = { kind: 'routine', conn: c.name, db: dbName, schema: r.schema, routine: r };
           const key = this.keyOf(s);
-          return this.node(key, 3, {
+          return this.node(key, depth + 2, {
             lead: icon(r.type === 'trigger' ? 'bolt' : 'fn'),
             label: r.name,
             meta: r.type + (r.table ? ' · ' + r.table : ''),
             onSelect: () => this.select(s, key),
           });
         }));
-      }
+      };
+      // Group databases by "_" prefix like phpMyAdmin: lumberjack, lumberjack_testing, lumberjack_testing_1 ...
+      const filterDb = (name: string) => !filter || name.toLowerCase().includes(filter) || this.dbn(c.name, name).expanded;
+      const level = (names: string[], prefix: string, depth: number) => {
+        const buckets = new Map<string, string[]>();
+        for (const name of names) {
+          const seg = name.slice(prefix.length).split('_')[0];
+          buckets.set(seg, [...(buckets.get(seg) ?? []), name]);
+        }
+        for (const [seg, members] of buckets) {
+          const nested = members.some((m) => m.length > prefix.length + seg.length);
+          if (members.length < 2 || !nested) {
+            for (const m of members) if (filterDb(m)) renderDb(m, depth);
+            continue;
+          }
+          const visible = members.filter(filterDb);
+          if (!visible.length) continue;
+          const gkey = c.name + '/~' + prefix + seg;
+          const open = !!filter || !!n.groups[gkey];
+          rows.push(this.node(gkey, depth, {
+            caret: open ? 'open' : 'closed', cls: 'group', lead: icon('db'), label: prefix + seg + '_', meta: String(members.length),
+            onToggle: () => { n.groups[gkey] = !n.groups[gkey]; this.render(); },
+            onSelect: () => { n.groups[gkey] = !n.groups[gkey]; this.render(); },
+          }));
+          if (!open) continue;
+          const exact = members.filter((m) => m === prefix + seg);
+          for (const m of exact) if (filterDb(m)) renderDb(m, depth + 1);
+          level(members.filter((m) => m !== prefix + seg), prefix + seg + '_', depth + 1);
+        }
+      };
+      level(n.databases, '', 1);
     }
     if (!state.connections.length) {
       rows.push(h('div', { class: 'empty', style: { padding: '16px' } }, 'No connections yet.', h('button', { class: 'btn', type: 'button', onclick: () => actions.editConnection() }, icon('plus'), 'New connection')));
