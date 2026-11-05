@@ -237,6 +237,7 @@ async function start() {
     else updateStatus();
   });
   await tree.reload();
+  if (state.boot.settings.lerdAutoConnect) tree.autoConnectLerd();
   clear(data.el, welcome());
   showTab('data');
   updateStatus();

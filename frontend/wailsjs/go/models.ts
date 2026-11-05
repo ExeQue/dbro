@@ -90,6 +90,7 @@ export namespace config {
 	    font: string;
 	    omarchyAsked: boolean;
 	    lerd: boolean;
+	    lerdAutoConnect: boolean;
 	    firstRunDone: boolean;
 	    queryTimeout: number;
 	
@@ -103,6 +104,7 @@ export namespace config {
 	        this.font = source["font"];
 	        this.omarchyAsked = source["omarchyAsked"];
 	        this.lerd = source["lerd"];
+	        this.lerdAutoConnect = source["lerdAutoConnect"];
 	        this.firstRunDone = source["firstRunDone"];
 	        this.queryTimeout = source["queryTimeout"];
 	    }

@@ -451,6 +451,7 @@ export async function settings() {
   };
   renderThemes();
   const lerd = h('input', { type: 'checkbox', checked: boot.settings.lerd });
+  const lerdConnect = h('input', { type: 'checkbox', checked: boot.settings.lerdAutoConnect });
   const font = h('input', { class: 'input', value: boot.settings.font ?? '', placeholder: 'monospace (from fontconfig)' });
   const timeout = h('input', { class: 'input', value: boot.settings.queryTimeout, inputmode: 'numeric' });
   const exe = boot.executable || 'dbro';
@@ -467,11 +468,12 @@ export async function settings() {
       } }, 'Save current as theme…'), h('span', { class: 'muted' }, `  Own themes: ${boot.configDir}/themes/*.toml`))),
     h('div', { class: 'form-row' }, field('Font', font), field('Agent query timeout (seconds)', timeout)),
     h('label', { class: 'check' }, lerd, ' Show lerd database services in the tree'),
+    h('label', { class: 'check' }, lerdConnect, ' Connect to lerd on startup'),
     h('fieldset', {}, h('legend', {}, 'MCP server for agents'),
       h('p', { class: 'muted' }, 'Agents get read-only access to your saved connections. Writes need "Allow agents to change data" on the connection.'),
       h('div', { style: { display: 'flex', gap: '6px' } }, h('code', { style: { flex: '1', userSelect: 'all' } }, mcpCmd), h('button', { type: 'button', class: 'btn small', onclick: () => { Go.CopyText(mcpCmd); toast('Copied'); } }, 'Copy'))),
   ), [{ label: 'Cancel' }, { label: 'Save', primary: true, action: async () => {
-    const s = { ...boot.settings, lerd: lerd.checked, font: font.value.trim(), queryTimeout: Number(timeout.value) || 30 };
+    const s = { ...boot.settings, lerd: lerd.checked, lerdAutoConnect: lerdConnect.checked, font: font.value.trim(), queryTimeout: Number(timeout.value) || 30 };
     await Go.SaveSettings(s as any);
     const t = await Go.SetTheme(chosen);
     applyTheme(t);

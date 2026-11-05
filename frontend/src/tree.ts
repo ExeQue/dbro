@@ -53,14 +53,19 @@ export class Tree {
     return (this.conn(conn).dbs[db] ??= { expanded: false, loading: false, groups: { tables: true, views: true, routines: false } });
   }
 
-  async toggleConn(name: string, open?: boolean) {
+  async toggleConn(name: string, open?: boolean, quiet = false) {
     const n = this.conn(name);
     n.expanded = open ?? !n.expanded;
-    if (n.expanded && !n.databases) await this.loadConn(name);
+    if (n.expanded && !n.databases) await this.loadConn(name, quiet);
     this.render();
   }
 
-  async loadConn(name: string) {
+  /** autoConnect opens every lerd connection; a stopped lerd service is skipped silently. */
+  async autoConnectLerd() {
+    await Promise.all(state.connections.filter((c) => c.source === 'lerd').map((c) => this.toggleConn(c.name, true, true)));
+  }
+
+  async loadConn(name: string, quiet = false) {
     const n = this.conn(name);
     n.loading = true;
     this.render();
@@ -73,7 +78,7 @@ export class Tree {
       if (only) await this.toggleDb(name, only, true);
     } catch (e) {
       n.expanded = false;
-      if (errorMessage(e) !== 'Canceled') toast(`${name}: ${errorMessage(e)}`, 'error');
+      if (!quiet && errorMessage(e) !== 'Canceled') toast(`${name}: ${errorMessage(e)}`, 'error');
     } finally {
       n.loading = false;
       this.render();

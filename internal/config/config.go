@@ -54,7 +54,8 @@ type Settings struct {
 	Theme        string `toml:"theme" json:"theme"` // dbro-dark | dbro-light | system | omarchy | <custom name>
 	Font         string `toml:"font,omitempty" json:"font"`
 	OmarchyAsked bool   `toml:"omarchy_asked,omitempty" json:"omarchyAsked"`
-	Lerd         bool   `toml:"lerd" json:"lerd"` // show lerd instances in the tree
+	Lerd         bool   `toml:"lerd" json:"lerd"`                         // show lerd instances in the tree
+	LerdConnect  bool   `toml:"lerd_auto_connect" json:"lerdAutoConnect"` // connect to them on startup
 	FirstRunDone bool   `toml:"first_run_done,omitempty" json:"firstRunDone"`
 	QueryTimeout int    `toml:"query_timeout,omitempty" json:"queryTimeout"` // seconds
 }
@@ -120,7 +121,7 @@ func SaveConnections(conns []Connection) error {
 
 // LoadSettings reads config.toml with defaults for missing values.
 func LoadSettings() (Settings, error) {
-	s := Settings{Lerd: true, QueryTimeout: 30}
+	s := Settings{Lerd: true, LerdConnect: true, QueryTimeout: 30}
 	_, err := toml.DecodeFile(filepath.Join(Dir(), "config.toml"), &s)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return s, fmt.Errorf("read config.toml: %w", err)
