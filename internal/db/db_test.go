@@ -228,3 +228,28 @@ func TestPostgres(t *testing.T) {
 	c, name := lerdConn(t, "postgres", 5432, "postgres")
 	exercise(t, c, name, "public")
 }
+
+func TestSQLiteRebuildKeepsUnique(t *testing.T) {
+	c := openSQLite(t)
+	ctx := context.Background()
+	p, _ := c.pool("main")
+	p.Exec(`CREATE TABLE u (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, name TEXT)`)
+	stmts, err := c.PlanSchema(ctx, "main", []SchemaOp{{Kind: "modify_column", Table: "u", Name: "name", Column: &Column{Name: "full_name", Type: "TEXT", Nullable: true}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.ApplySchema(ctx, "main", stmts); err != nil {
+		t.Fatal(err)
+	}
+	def, _ := c.Describe(ctx, "main", "", "u")
+	if def.Columns[1].Key != "UNI" {
+		t.Fatalf("unique lost: %+v", def.Indexes)
+	}
+	stmts, err = c.PlanSchema(ctx, "main", []SchemaOp{{Kind: "drop_index", Table: "u", Name: def.Indexes[1].Name}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := c.ApplySchema(ctx, "main", stmts); err != nil {
+		t.Fatal(err)
+	}
+}

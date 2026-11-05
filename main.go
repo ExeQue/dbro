@@ -51,13 +51,19 @@ func main() {
 		}
 	}
 
+	// WebKitGTK on Wayland with fractional scaling keeps showing a stretched old frame
+	// while a tiled window resizes; software compositing relayouts immediately.
+	for k, v := range map[string]string{"WEBKIT_DISABLE_COMPOSITING_MODE": "1", "WEBKIT_DISABLE_DMABUF_RENDERER": "1"} {
+		if _, ok := os.LookupEnv(k); !ok {
+			os.Setenv(k, v)
+		}
+	}
+
 	app := NewApp()
 	err := wails.Run(&options.App{
 		Title:     "dbro",
 		Width:     1280,
 		Height:    800,
-		MinWidth:  640,
-		MinHeight: 400,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

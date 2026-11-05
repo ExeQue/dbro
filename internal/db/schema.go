@@ -341,11 +341,19 @@ func (c *Conn) planOne(op SchemaOp, get func(schema, table string) (*TableDef, e
 			stmts = []string{fmt.Sprintf("ALTER TABLE %s DROP PRIMARY KEY;", t)}
 		case ix.Primary && k == "postgres":
 			stmts = []string{fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT %s;", t, c.Q(ix.Name))}
-		case ix.Primary:
+		case ix.Primary, k == "sqlite" && strings.HasPrefix(ix.Name, "sqlite_autoindex"):
 			next := *d
-			next.Indexes = withoutPrimary(d.Indexes)
-			for i := range next.Columns {
-				next.Columns[i].AutoIncrement = false
+			next.Indexes = nil
+			for _, x := range d.Indexes {
+				if x.Name != ix.Name {
+					next.Indexes = append(next.Indexes, x)
+				}
+			}
+			if ix.Primary {
+				next.Columns = append([]Column{}, d.Columns...)
+				for i := range next.Columns {
+					next.Columns[i].AutoIncrement = false
+				}
 			}
 			stmts = c.rebuild(*d, next, map[string]string{})
 		case k == "mysql":
@@ -492,9 +500,14 @@ func (c *Conn) rebuild(old, next TableDef, renamed map[string]string) []string {
 	}
 	stmts = append(stmts, "DROP TABLE "+c.Q(old.Name)+";", fmt.Sprintf("ALTER TABLE %s RENAME TO %s;", c.Q(tmp), c.Q(next.Name)))
 	for _, ix := range next.Indexes {
-		if !ix.Primary && !strings.HasPrefix(ix.Name, "sqlite_autoindex") {
-			stmts = append(stmts, c.createIndex("", next.Name, ix)+";")
+		if ix.Primary {
+			continue
 		}
+		if strings.HasPrefix(ix.Name, "sqlite_autoindex") {
+			// inline UNIQUE constraints come back as named unique indexes
+			ix.Name = next.Name + "_" + strings.Join(ix.Columns, "_") + "_unique"
+		}
+		stmts = append(stmts, c.createIndex("", next.Name, ix)+";")
 	}
 	return append(stmts, "COMMIT;", "PRAGMA foreign_keys = ON;")
 }

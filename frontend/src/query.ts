@@ -76,7 +76,7 @@ export class QueryTab {
   /** useSelection points the tab at the selected connection and database (until it has run). */
   useSelection(sel: Selection | null) {
     if (this.running || !sel) return;
-    const db = sel.db ?? connInfo(sel.conn)?.database ?? (dialect(sel.conn) === 'sqlite' ? 'main' : '');
+    const db = sel.db || connInfo(sel.conn)?.database || (dialect(sel.conn) === 'sqlite' ? 'main' : '');
     if (sel.conn === this.conn && db === this.database) return;
     if (this.conn && (this.conn !== sel.conn || this.database !== db)) Go.CloseQueryTab(this.conn, this.database, this.id);
     this.conn = sel.conn;

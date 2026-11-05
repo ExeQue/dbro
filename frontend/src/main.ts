@@ -46,11 +46,11 @@ function layout() {
   });
   const toolbar = h('header', { class: 'toolbar' },
     h('span', { class: 'brand' }, 'd', h('b', {}, 'bro')),
-    h('button', { type: 'button', class: 'btn', onclick: () => actions.editConnection() }, icon('plus'), 'New connection'),
-    h('button', { type: 'button', class: 'btn', title: 'Refresh (F5)', onclick: () => refresh() }, icon('refresh'), 'Refresh', h('span', { class: 'shortcut' }, 'F5')),
-    h('button', { type: 'button', class: 'btn', onclick: () => openQuery(state.selection) }, icon('file'), 'New query', h('span', { class: 'shortcut' }, 'Ctrl+T')),
+    h('button', { type: 'button', class: 'btn', title: 'New connection (Ctrl+N)', 'aria-label': 'New connection', onclick: () => actions.editConnection() }, icon('plus'), h('span', { class: 'lbl' }, 'New connection')),
+    h('button', { type: 'button', class: 'btn', title: 'Refresh (F5)', 'aria-label': 'Refresh', onclick: () => refresh() }, icon('refresh'), h('span', { class: 'lbl' }, 'Refresh'), h('span', { class: 'shortcut' }, 'F5')),
+    h('button', { type: 'button', class: 'btn', title: 'New query (Ctrl+T)', 'aria-label': 'New query', onclick: () => openQuery(state.selection) }, icon('file'), h('span', { class: 'lbl' }, 'New query'), h('span', { class: 'shortcut' }, 'Ctrl+T')),
     h('span', { class: 'spacer' }),
-    h('button', { type: 'button', class: 'btn', onclick: () => actions.quickSearch() }, icon('search'), 'Quick search', h('span', { class: 'shortcut' }, 'Ctrl+P')),
+    h('button', { type: 'button', class: 'btn', title: 'Quick search (Ctrl+P)', 'aria-label': 'Quick search', onclick: () => actions.quickSearch() }, icon('search'), h('span', { class: 'lbl' }, 'Quick search'), h('span', { class: 'shortcut' }, 'Ctrl+P')),
     h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Settings', title: 'Settings', onclick: () => actions.settings() }, icon('gear', 16)),
   );
   const main = h('main', { class: 'main' }, breadcrumb, tabbar, content);
