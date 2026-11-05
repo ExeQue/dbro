@@ -230,10 +230,14 @@ func (c *Conn) Routines(ctx context.Context, database string) ([]Routine, error)
 		rows, e = c.rows(ctx, database, `SELECT n.nspname, t.tgname, c.relname FROM pg_trigger t
 			JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
 			WHERE NOT t.tgisinternal ORDER BY 1, 2`)
-		err = add(rows, e, func(r []any) Routine { return Routine{Schema: str(r[0]), Name: str(r[1]), Type: "trigger", Table: str(r[2])} })
+		err = add(rows, e, func(r []any) Routine {
+			return Routine{Schema: str(r[0]), Name: str(r[1]), Type: "trigger", Table: str(r[2])}
+		})
 	case "sqlite":
 		rows, e := c.rows(ctx, database, "SELECT name, tbl_name FROM sqlite_master WHERE type = 'trigger' ORDER BY name")
-		err = add(rows, e, func(r []any) Routine { return Routine{Schema: "main", Name: str(r[0]), Type: "trigger", Table: str(r[1])} })
+		err = add(rows, e, func(r []any) Routine {
+			return Routine{Schema: "main", Name: str(r[0]), Type: "trigger", Table: str(r[1])}
+		})
 	}
 	return out, err
 }
@@ -691,3 +695,30 @@ func sortedKeys(m map[string]any) []string {
 }
 
 var _ = sql.ErrNoRows
+
+// Defaults returns the database a connection opens by default.
+func (c *Conn) Defaults() string { return c.defaultDB() }
+
+// Completions maps table names to their column names, for SQL autocomplete.
+func (c *Conn) Completions(ctx context.Context, database string) (map[string][]string, error) {
+	out := map[string][]string{}
+	var rows [][]any
+	var err error
+	switch c.Kind() {
+	case "mysql":
+		rows, err = c.rows(ctx, database, "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME, ORDINAL_POSITION", database)
+	case "postgres":
+		rows, err = c.rows(ctx, database, `SELECT CASE WHEN table_schema = 'public' THEN table_name ELSE table_schema || '.' || table_name END, column_name
+			FROM information_schema.columns WHERE table_schema NOT IN ('pg_catalog','information_schema') ORDER BY 1, ordinal_position`)
+	case "sqlite":
+		rows, err = c.rows(ctx, database, "SELECT m.name, p.name FROM sqlite_master m JOIN pragma_table_info(m.name) p WHERE m.type IN ('table','view') AND m.name NOT LIKE 'sqlite_%' ORDER BY m.name, p.cid")
+	}
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		t := str(r[0])
+		out[t] = append(out[t], str(r[1]))
+	}
+	return out, nil
+}

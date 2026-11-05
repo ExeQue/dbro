@@ -1,36 +1,77 @@
 package main
 
 import (
+	"context"
 	"embed"
+	"fmt"
+	"os"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/linux"
+
+	"github.com/ExeQue/dbro/internal/mcpserver"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
-func main() {
-	// Create an instance of the app structure
-	app := NewApp()
+//go:embed build/appicon.png
+var icon []byte
 
-	// Create application with options
+var version = "dev"
+
+const usage = `dbro: a simple SQL browser for Linux.
+
+Usage:
+  dbro            open the app
+  dbro mcp        serve saved connections to agents over MCP (stdio)
+  dbro version    print the version
+
+Add to Claude Code:
+  claude mcp add dbro -- dbro mcp
+`
+
+func main() {
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "mcp":
+			if err := mcpserver.Run(context.Background(), version); err != nil {
+				fmt.Fprintln(os.Stderr, "dbro mcp:", err)
+				os.Exit(1)
+			}
+			return
+		case "version", "--version":
+			fmt.Println(version)
+			return
+		case "help", "--help", "-h":
+			fmt.Print(usage)
+			return
+		}
+	}
+
+	app := NewApp()
 	err := wails.Run(&options.App{
-		Title:  "dbro",
-		Width:  1024,
-		Height: 768,
+		Title:     "dbro",
+		Width:     1280,
+		Height:    800,
+		MinWidth:  640,
+		MinHeight: 400,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		BackgroundColour: &options.RGBA{R: 26, G: 18, B: 20, A: 1},
 		OnStartup:        app.startup,
-		Bind: []interface{}{
-			app,
+		OnShutdown:       app.shutdown,
+		Bind:             []interface{}{app},
+		Linux: &linux.Options{
+			Icon:        icon,
+			ProgramName: "dbro",
 		},
 	})
-
 	if err != nil {
-		println("Error:", err.Error())
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		os.Exit(1)
 	}
 }

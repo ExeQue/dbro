@@ -43,10 +43,10 @@ type Connection struct {
 	HideFromAgents   bool `toml:"hide_from_agents,omitempty" json:"hideFromAgents"`
 
 	// Set at runtime, never saved.
-	Source   string `toml:"-" json:"source"`   // manual | lerd | laravel
-	Label    string `toml:"-" json:"label"`    // extra text shown in the tree
-	Password string `toml:"-" json:"-"`        // known password (lerd defaults, .env)
-	Missing  bool   `toml:"-" json:"missing"`  // laravel project or sqlite file not found
+	Source   string `toml:"-" json:"source"`  // manual | lerd | laravel
+	Label    string `toml:"-" json:"label"`   // extra text shown in the tree
+	Password string `toml:"-" json:"-"`       // known password (lerd defaults, .env)
+	Missing  bool   `toml:"-" json:"missing"` // laravel project or sqlite file not found
 }
 
 // Settings holds app-wide preferences.
