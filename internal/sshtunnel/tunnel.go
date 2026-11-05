@@ -21,6 +21,36 @@ import (
 	"github.com/ExeQue/dbro/internal/config"
 )
 
+// sshConfig is ~/.ssh/config, read fresh for every tunnel so edits apply.
+type sshConfig struct{ files []*ssh_config.Config }
+
+func (c sshConfig) Get(alias, key string) string {
+	for _, f := range c.files {
+		if v, err := f.Get(alias, key); err == nil && v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func loadSSHConfig() sshConfig {
+	var c sshConfig
+	home, _ := os.UserHomeDir()
+	for _, p := range []string{filepath.Join(home, ".ssh", "config"), "/etc/ssh/ssh_config"} {
+		if f, err := os.Open(p); err == nil {
+			if cfg, err := ssh_config.Decode(f); err == nil {
+				c.files = append(c.files, cfg)
+			}
+			f.Close()
+		}
+	}
+	return c
+}
+
+var sshcfg = loadSSHConfig()
+
+func reloadSSHConfig() { sshcfg = loadSSHConfig() }
+
 // UnknownHostError asks the user to trust a host key.
 type UnknownHostError struct {
 	Host        string
@@ -57,24 +87,24 @@ type hop struct {
 
 func resolve(alias string, port int, user, key string) hop {
 	h := hop{alias: alias}
-	host := ssh_config.Get(alias, "HostName")
+	host := sshcfg.Get(alias, "HostName")
 	if host == "" {
 		host = alias
 	}
 	if port == 0 {
-		port, _ = strconv.Atoi(ssh_config.Get(alias, "Port"))
+		port, _ = strconv.Atoi(sshcfg.Get(alias, "Port"))
 	}
 	if port == 0 {
 		port = 22
 	}
 	if user == "" {
-		user = ssh_config.Get(alias, "User")
+		user = sshcfg.Get(alias, "User")
 	}
 	if user == "" {
 		user = os.Getenv("USER")
 	}
 	if key == "" {
-		if k := ssh_config.Get(alias, "IdentityFile"); k != "" && k != "~/.ssh/identity" {
+		if k := sshcfg.Get(alias, "IdentityFile"); k != "" && k != "~/.ssh/identity" {
 			key = k
 		}
 	}
@@ -87,9 +117,10 @@ func resolve(alias string, port int, user, key string) hop {
 // forwards a local port to remoteHost:remotePort.
 // secret is the SSH password or key passphrase; it may be empty.
 func Open(s config.SSH, remoteHost string, remotePort int, secret string) (*Tunnel, error) {
+	reloadSSHConfig()
 	target := resolve(s.Host, s.Port, s.User, s.Key)
 	var hops []hop
-	if pj := ssh_config.Get(s.Host, "ProxyJump"); pj != "" && pj != "none" {
+	if pj := sshcfg.Get(s.Host, "ProxyJump"); pj != "" && pj != "none" {
 		for _, j := range strings.Split(pj, ",") {
 			user, host := "", strings.TrimSpace(j)
 			if u, h, ok := strings.Cut(host, "@"); ok {

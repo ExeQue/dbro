@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/ExeQue/dbro/internal/config"
+	"github.com/ExeQue/dbro/internal/sshtunnel"
+	"github.com/ExeQue/dbro/internal/sshtunnel/sshtest"
 )
 
 func ptr(s string) *string { return &s }
@@ -271,5 +273,43 @@ func TestCloneSQLiteToMySQL(t *testing.T) {
 	res, _, err := dst.Browse(ctx, name, "", "users", "", "id", false, 0, 10)
 	if err != nil || len(res.Rows) != 1 || res.Rows[0][2] != "pending" {
 		t.Fatalf("%v %v", res.Rows, err)
+	}
+}
+
+func TestThroughSSHAndTLS(t *testing.T) {
+	if os.Getenv("DBRO_TEST_LERD") == "" {
+		t.Skip("set DBRO_TEST_LERD=1")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SSH_AUTH_SOCK", "")
+	t.Setenv("DBRO_STATE_DIR", t.TempDir())
+	port := sshtest.Server(t, "pw", nil)
+	ctx := context.Background()
+	s := &config.SSH{Host: "127.0.0.1", Port: port, User: "dev"}
+	uh, err := sshtunnel.FetchHostKey(*s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sshtunnel.Trust(uh)
+	for _, cfg := range []config.Connection{
+		{Name: "pg", Driver: "postgres", Host: "127.0.0.1", Port: 5432, User: "postgres", SSH: s},
+		{Name: "my", Driver: "mysql", Host: "127.0.0.1", Port: 3307, User: "root", SSH: s},
+		{Name: "my-tls", Driver: "mysql", Host: "127.0.0.1", Port: 3307, User: "root", SSLMode: "require"},
+	} {
+		c, err := Open(ctx, cfg, "lerd", "pw", "gui")
+		if err != nil {
+			t.Fatalf("%s: %v", cfg.Name, err)
+		}
+		if _, err := c.Databases(ctx); err != nil {
+			t.Fatalf("%s: %v", cfg.Name, err)
+		}
+		if cfg.SSLMode == "require" {
+			rs, err := c.QueryReadOnly(ctx, "", "SHOW SESSION STATUS LIKE 'Ssl_cipher'", 1)
+			if err != nil || len(rs) == 0 || len(rs[0].Rows) == 0 || rs[0].Rows[0][1] == "" {
+				t.Fatalf("no TLS cipher: %+v %v", rs, err)
+			}
+		}
+		c.Close()
 	}
 }
