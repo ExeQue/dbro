@@ -69,6 +69,7 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 26, G: 18, B: 20, A: 1},
 		OnStartup:        app.startup,
+		OnDomReady:       func(context.Context) { unlockWindowSize() },
 		OnShutdown:       app.shutdown,
 		Bind:             []interface{}{app},
 		Linux: &linux.Options{

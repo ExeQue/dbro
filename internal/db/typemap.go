@@ -34,6 +34,9 @@ func MapTableDef(def TableDef, from, to string) TableDef {
 		if from != to {
 			col.Default = mapDefault(col.Default)
 		}
+		if to == "mysql" && col.Default != nil && strings.HasPrefix(*col.Default, "CURRENT_TIMESTAMP") && !strings.Contains(col.Type, "time") {
+			col.Type = "datetime" // only temporal columns may default to CURRENT_TIMESTAMP in MySQL
+		}
 		if to == "mysql" {
 			// MySQL cannot index or default TEXT columns; BLOB and JSON take no literal default either.
 			switch col.Type {

@@ -261,7 +261,7 @@ func TestCloneSQLiteToMySQL(t *testing.T) {
 	src := openSQLite(t)
 	ctx := context.Background()
 	p, _ := src.pool("main")
-	if _, err := p.Exec(`CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, status TEXT DEFAULT 'pending', meta TEXT);
+	if _, err := p.Exec(`CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE, status TEXT DEFAULT 'pending', meta TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP);
 		CREATE TABLE orders (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id), total NUMERIC DEFAULT 0);
 		INSERT INTO users (email, meta) VALUES ('a@example.com', '{"x":1}'); INSERT INTO orders (user_id, total) VALUES (1, 12.5);`); err != nil {
 		t.Fatal(err)
