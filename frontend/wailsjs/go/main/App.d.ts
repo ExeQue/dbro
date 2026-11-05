@@ -12,7 +12,7 @@ export function ApplyRowChanges(arg1:string,arg2:string,arg3:string,arg4:string,
 
 export function ApplySchema(arg1:string,arg2:string,arg3:Array<string>):Promise<void>;
 
-export function Browse(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:boolean,arg8:number,arg9:number):Promise<main.BrowseResult>;
+export function Browse(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:Array<db.SortKey>,arg7:number,arg8:number):Promise<main.BrowseResult>;
 
 export function CancelQuery(arg1:string):Promise<void>;
 

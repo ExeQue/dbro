@@ -51,6 +51,7 @@ a { color: var(--accent); }
 #app { height: 100vh; display: flex; flex-direction: column; }
 .toolbar { display: flex; flex-wrap: nowrap; overflow: hidden; align-items: center; gap: 6px; padding: 6px 10px; background: var(--dark-background); border-bottom: 1px solid var(--border); }
 .brand { font-weight: 700; margin-right: 10px; display: flex; align-items: center; gap: 1px; }
+/* "bro" sits a touch higher than "d" because each is centered on its own in the flex row: wanted, keep it. */
 .brand b { color: var(--accent); }
 .brand-logo { margin-right: 6px; }
 .spacer { flex: 1; }
@@ -86,7 +87,7 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .node { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 24px; padding: 0 8px; background: transparent; border: 0; text-align: left; cursor: pointer; white-space: nowrap; }
 .node:hover { background: var(--hover); }
 .node.selected { background: var(--selection); }
-.node .caret { width: 14px; display: inline-flex; color: var(--dark-foreground); flex: none; }
+.node .caret { width: 14px; display: inline-flex; justify-content: center; color: var(--dark-foreground); flex: none; margin-left: 2px; }
 .node .label { overflow: hidden; text-overflow: ellipsis; }
 .node .meta { margin-left: auto; color: var(--dark-foreground); font-size: 11px; padding-left: 8px; }
 .node .badge { font-size: 10px; padding: 0 5px; border-radius: 8px; background: var(--lighter-background); color: var(--light-foreground); }

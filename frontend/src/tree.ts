@@ -248,11 +248,11 @@ export class Tree {
     });
     const b = h('button', {
       type: 'button', role: 'treeitem', class: 'node ' + (o.cls ?? '') + (key === this.selectedKey ? ' selected' : ''),
-      style: { paddingLeft: 8 + depth * 16 + 'px' }, 'data-key': key,
+      style: { paddingLeft: 8 + depth * 12 + 'px' }, 'data-key': key,
       'aria-expanded': o.caret ? String(o.caret === 'open') : undefined, 'aria-selected': String(key === this.selectedKey),
       onclick: () => o.onSelect(),
       ondblclick: () => o.onToggle?.(),
-    }, caret, o.lead ?? null, h('span', { class: 'label' }, o.label), o.meta ? h('span', { class: 'meta' }, o.meta) : null);
+    }, o.lead ?? null, h('span', { class: 'label' }, o.label), h('span', { class: 'meta' }, o.meta ?? ''), caret);
     (b as any)._toggle = o.onToggle;
     if (o.menu) b.addEventListener('contextmenu', (e) => {
       e.preventDefault();

@@ -346,6 +346,20 @@ export namespace db {
 		    return a;
 		}
 	}
+	export class SortKey {
+	    col: string;
+	    desc: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new SortKey(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.col = source["col"];
+	        this.desc = source["desc"];
+	    }
+	}
 	
 	export class TableInfo {
 	    schema: string;

@@ -4,14 +4,29 @@ import { menu, toast, type MenuItem } from './dialogs';
 import { Go } from './api';
 import type { db } from '../wailsjs/go/models';
 
+export interface SortKey {
+  col: string;
+  desc: boolean;
+}
+
+/** nextSort cycles a column through ascending, descending and off; add keeps the other columns. */
+export function nextSort(sort: SortKey[], col: string, add: boolean): SortKey[] {
+  const cur = sort.find((s) => s.col === col);
+  const others = add ? sort.filter((s) => s.col !== col) : [];
+  if (!cur) return [...others, { col, desc: false }];
+  if (!cur.desc) return add ? sort.map((s) => (s.col === col ? { col, desc: true } : s)) : [{ col, desc: true }];
+  return others;
+}
+
 export interface GridOptions {
   editable?: boolean;
   pk?: string[];
   fks?: db.ForeignKey[];
   table?: string;
   quote?: (s: string) => string;
-  sort?: { col: string; desc: boolean } | null;
-  onSort?: (col: string) => void;
+  sort?: SortKey[];
+  /** onSort is called on a header click; add is true with Ctrl or Shift held (secondary sort). */
+  onSort?: (col: string, add: boolean) => void;
   onFollow?: (fk: db.ForeignKey, values: unknown[]) => void;
   onChange?: () => void;
 }
@@ -77,12 +92,17 @@ export class Grid {
   }
 
   private render() {
-    const sort = this.opt.sort;
+    const sort = this.opt.sort ?? [];
     const fkCols = new Set((this.opt.fks ?? []).flatMap((f) => f.columns));
-    const head = h('tr', {}, h('th', { class: 'rownum' }, '#'), this.columns.map((c, i) => h('th', {
-      title: this.opt.onSort ? 'Sort by ' + c : c,
-      onclick: () => this.opt.onSort?.(c),
-    }, c, sort?.col === c ? h('span', { class: 'sort' }, sort.desc ? '▼' : '▲') : null, this.types[i] ? h('span', { class: 'type' }, this.types[i]) : null)));
+    const head = h('tr', {}, h('th', { class: 'rownum' }, '#'), this.columns.map((c, i) => {
+      const at = sort.findIndex((s) => s.col === c);
+      const mark = at < 0 ? null : h('span', { class: 'sort' }, (sort[at].desc ? '▼' : '▲') + (sort.length > 1 ? String(at + 1) : ''));
+      return h('th', {
+        title: this.opt.onSort ? `Sort by ${c} (Ctrl+click adds a column)` : c,
+        'aria-sort': at < 0 ? undefined : sort[at].desc ? 'descending' : 'ascending',
+        onclick: (e: MouseEvent) => this.opt.onSort?.(c, e.ctrlKey || e.shiftKey || e.metaKey),
+      }, c, mark, this.types[i] ? h('span', { class: 'type' }, this.types[i]) : null);
+    }));
     const body = h('tbody');
     const frag = document.createDocumentFragment();
     const isNum = this.types.map((t) => numericType.test(t ?? ''));

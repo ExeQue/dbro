@@ -7,7 +7,7 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
 import { h, clear, icon, nextId, formatCount } from './util';
 import { Go, forConn } from './api';
-import { Grid } from './grid';
+import { Grid, nextSort } from './grid';
 import { dropdown, toast, prompt, modal, errorMessage, type MenuItem } from './dialogs';
 import { connInfo, dialect, quoteIdent, type Selection } from './state';
 import type { db } from '../wailsjs/go/models';
@@ -166,7 +166,7 @@ export class QueryTab {
         g.el);
     };
     sets.forEach((r, i) => {
-      const g = new Grid({ quote: quoteIdent(this.conn), table: 'result', onSort: (col) => sortLocal(g, r, col) });
+      const g = new Grid({ quote: quoteIdent(this.conn), table: 'result', onSort: (col, add) => sortLocal(g, r, col, add) });
       g.set(r.columns, r.types, r.rows ?? []);
       this.grids.push(g);
       tabbar.append(h('button', { type: 'button', class: 'tab', onclick: () => show(i) }, `Result ${i + 1}`));
@@ -211,19 +211,24 @@ export class QueryTab {
   }
 }
 
-function sortLocal(g: Grid, r: db.Result, col: string) {
-  const i = r.columns.indexOf(col);
-  const desc = g.opt.sort?.col === col && !g.opt.sort.desc;
-  const rows = [...(r.rows ?? [])].sort((a: any, b: any) => {
-    const x = a[i], y = b[i];
+function sortLocal(g: Grid, r: db.Result, col: string, add: boolean) {
+  const sort = nextSort(g.opt.sort ?? [], col, add);
+  const idx = sort.map((k) => ({ i: r.columns.indexOf(k.col), desc: k.desc }));
+  const cmp = (x: any, y: any) => {
     if (x === y) return 0;
     if (x === null) return 1;
     if (y === null) return -1;
-    const c = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
-    return desc ? -c : c;
+    return typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
+  };
+  const rows = [...(r.rows ?? [])].sort((a: any, b: any) => {
+    for (const k of idx) {
+      const c = cmp(a[k.i], b[k.i]);
+      if (c) return k.desc ? -c : c;
+    }
+    return 0;
   });
-  g.opt.sort = { col, desc };
-  g.set(r.columns, r.types, rows);
+  g.opt.sort = sort;
+  g.set(r.columns, r.types, sort.length ? rows : r.rows ?? []);
 }
 
 function resizeRows(handle: HTMLElement, box: HTMLElement) {

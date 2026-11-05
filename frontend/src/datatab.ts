@@ -2,8 +2,8 @@
 // or an overview when a database or connection is selected.
 import { h, clear, icon, formatCount, formatBytes, debounce } from './util';
 import { Go, forConn } from './api';
-import { Grid } from './grid';
-import { dropdown, toast, errorMessage, confirm, showError } from './dialogs';
+import { Grid, nextSort, type SortKey } from './grid';
+import { dropdown, toast, errorMessage, confirm, showError, modal } from './dialogs';
 import { state, connInfo, quoteIdent, dialect, type Selection } from './state';
 import * as actions from './actions';
 import { logo } from './logo';
@@ -17,7 +17,7 @@ export class DataTab {
   private grid: Grid | null = null;
   private def: db.TableDef | null = null;
   private where = '';
-  private sort: { col: string; desc: boolean } | null = null;
+  private sort: SortKey[] = [];
   private offset = 0;
   private total = 0;
   private pending = h('div', { class: 'pending-bar', hidden: true });
@@ -25,6 +25,7 @@ export class DataTab {
   private whereInput = h('input', { class: 'input', style: { flex: '3 1 260px' }, placeholder: "WHERE …  e.g. email LIKE '%@example.com'", 'aria-label': 'Filter rows (WHERE clause)', spellcheck: 'false' });
   private quickInput = h('input', { class: 'input', type: 'search', style: { flex: '1 1 180px' }, placeholder: 'Quick filter: search all columns', 'aria-label': 'Quick filter across all columns', spellcheck: 'false' });
   private token = 0;
+  private sortBtn: HTMLButtonElement | null = null;
 
   constructor() {
     this.whereInput.addEventListener('keydown', (e) => {
@@ -72,7 +73,7 @@ export class DataTab {
     this.where = '';
     this.whereInput.value = '';
     this.quickInput.value = '';
-    this.sort = null;
+    this.sort = [];
     this.offset = 0;
     this.def = null;
     if (!sel) return clear(this.el, welcome());
@@ -89,8 +90,8 @@ export class DataTab {
       editable: !isView,
       table: sel.table,
       quote: q,
-      onSort: (col) => {
-        this.sort = this.sort?.col === col ? (this.sort.desc ? null : { col, desc: true }) : { col, desc: false };
+      onSort: (col, add) => {
+        this.sort = nextSort(this.sort, col, add);
         this.offset = 0;
         this.load();
       },
@@ -107,7 +108,9 @@ export class DataTab {
       h('button', { type: 'button', class: 'btn', onclick: () => this.applyFilter() }, 'Apply'),
       h('button', { type: 'button', class: 'btn', onclick: () => { this.whereInput.value = ''; this.quickInput.value = ''; this.applyFilter(); } }, 'Clear'),
     );
+    this.sortBtn = h('button', { type: 'button', class: 'btn', onclick: () => this.editSort() }, 'Sort');
     const toolbar = h('div', { class: 'pane-toolbar' },
+      this.sortBtn,
       this.info,
       h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Previous page', onclick: () => this.page(-1) }, '‹'),
       h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Next page', onclick: () => this.page(1) }, '›'),
@@ -139,10 +142,11 @@ export class DataTab {
     const token = ++this.token;
     this.info.textContent = 'Loading…';
     try {
-      const r = await forConn(sel.conn, () => Go.Browse(sel.conn, sel.db!, sel.schema ?? '', sel.table!, this.effectiveWhere(), this.sort?.col ?? '', this.sort?.desc ?? false, this.offset, PAGE));
+      const r = await forConn(sel.conn, () => Go.Browse(sel.conn, sel.db!, sel.schema ?? '', sel.table!, this.effectiveWhere(), this.sort as any, this.offset, PAGE));
       if (token !== this.token) return;
       this.total = r.total;
       this.grid.opt.sort = this.sort;
+      if (this.sortBtn) this.sortBtn.textContent = this.sort.length ? 'Sort: ' + this.sort.map((k) => k.col + (k.desc ? ' ↓' : ' ↑')).join(', ') : 'Sort';
       this.grid.set(r.result.columns, r.result.types, r.result.rows);
       const n = r.result.rows?.length ?? 0;
       this.info.textContent = n ? `Rows ${formatCount(this.offset + 1)}–${formatCount(this.offset + n)} of ${formatCount(this.total)}` : `0 of ${formatCount(this.total)} rows`;
@@ -153,6 +157,32 @@ export class DataTab {
       this.grid.set([], [], []);
       toast(errorMessage(e), 'error');
     }
+  }
+
+  /** editSort shows HeidiSQL's sorting dialog: an ordered list of columns with a direction each. */
+  private async editSort() {
+    const cols = this.def?.columns.map((c) => c.name) ?? [];
+    let keys = this.sort.map((k) => ({ ...k }));
+    const list = h('div', { class: 'form' });
+    const render = () => {
+      clear(list,
+        keys.length ? null : h('p', { class: 'muted' }, 'Not sorted. Add a column below.'),
+        keys.map((k, i) => {
+          const col = h('select', { class: 'input', 'aria-label': `Sort column ${i + 1}` }, cols.map((c) => h('option', { value: c, selected: c === k.col }, c)));
+          col.addEventListener('change', () => (k.col = col.value));
+          const dir = h('select', { class: 'input', 'aria-label': `Direction ${i + 1}` }, h('option', { value: 'asc', selected: !k.desc }, 'Ascending'), h('option', { value: 'desc', selected: k.desc }, 'Descending'));
+          dir.addEventListener('change', () => (k.desc = dir.value === 'desc'));
+          return h('div', { class: 'form-row', style: { gridTemplateColumns: '2fr 1fr auto' } }, col, dir,
+            h('button', { type: 'button', class: 'btn icon danger', 'aria-label': 'Remove', onclick: () => { keys.splice(i, 1); render(); } }, icon('x', 12)));
+        }),
+        h('div', {}, h('button', { type: 'button', class: 'btn', disabled: !cols.length, onclick: () => { keys.push({ col: cols.find((c) => !keys.some((k) => k.col === c)) ?? cols[0], desc: false }); render(); } }, icon('plus'), 'Add column')));
+    };
+    render();
+    const r = await modal('Sorting', list, [{ label: 'Clear', action: () => { keys = []; } }, { label: 'Cancel' }, { label: 'Apply', primary: true }]);
+    if (r === 1 || r < 0) return;
+    this.sort = keys.filter((k, i) => keys.findIndex((x) => x.col === k.col) === i);
+    this.offset = 0;
+    this.load();
   }
 
   private page(dir: number) {

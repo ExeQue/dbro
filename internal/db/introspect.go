@@ -564,8 +564,14 @@ func (c *Conn) describeSQLite(ctx context.Context, database string, def *TableDe
 	return nil
 }
 
+// SortKey is one ORDER BY column.
+type SortKey struct {
+	Col  string `json:"col"`
+	Desc bool   `json:"desc"`
+}
+
 // Browse returns one page of a table, with the total count for the filter.
-func (c *Conn) Browse(ctx context.Context, database, schema, table, where, orderBy string, desc bool, offset, limit int) (Result, int64, error) {
+func (c *Conn) Browse(ctx context.Context, database, schema, table, where string, order []SortKey, offset, limit int) (Result, int64, error) {
 	p, err := c.pool(database)
 	if err != nil {
 		return Result{}, 0, err
@@ -586,11 +592,15 @@ func (c *Conn) Browse(ctx context.Context, database, schema, table, where, order
 		}
 	}
 	q := "SELECT * FROM " + from + cond
-	if orderBy != "" {
-		q += " ORDER BY " + c.Q(orderBy)
-		if desc {
-			q += " DESC"
+	if len(order) > 0 {
+		parts := make([]string, len(order))
+		for i, o := range order {
+			parts[i] = c.Q(o.Col)
+			if o.Desc {
+				parts[i] += " DESC"
+			}
 		}
+		q += " ORDER BY " + strings.Join(parts, ", ")
 	}
 	q += fmt.Sprintf(" LIMIT %d OFFSET %d", limit, offset)
 	r, err := c.run(ctx, p, database, q, 0)

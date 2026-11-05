@@ -445,12 +445,12 @@ type BrowseResult struct {
 }
 
 // Browse returns a page of rows.
-func (a *App) Browse(name, database, schema, table, where, orderBy string, desc bool, offset, limit int) (BrowseResult, error) {
+func (a *App) Browse(name, database, schema, table, where string, order []db.SortKey, offset, limit int) (BrowseResult, error) {
 	c, err := a.conn(name)
 	if err != nil {
 		return BrowseResult{}, err
 	}
-	r, total, err := c.Browse(a.ctx, database, schema, table, where, orderBy, desc, offset, limit)
+	r, total, err := c.Browse(a.ctx, database, schema, table, where, order, offset, limit)
 	return BrowseResult{Result: r, Total: total}, err
 }
 

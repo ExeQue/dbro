@@ -76,7 +76,7 @@ func exercise(t *testing.T, c *Conn, database, schema string) {
 	_, err = c.ApplyRowChanges(ctx, database, schema, "users", []RowChange{{Op: "update", Where: map[string]any{"id": int64(2)}, Set: map[string]any{"name": "Jonas B"}}})
 	must(err)
 
-	res, total, err := c.Browse(ctx, database, schema, "users", "", "id", false, 0, 1000)
+	res, total, err := c.Browse(ctx, database, schema, "users", "", []SortKey{{Col: "id"}}, 0, 1000)
 	must(err)
 	if total != 2 || res.Rows[1][1] != "Jonas B" || res.Rows[1][2] != nil {
 		t.Fatalf("browse: %d %v", total, res.Rows)
@@ -104,7 +104,7 @@ func exercise(t *testing.T, c *Conn, database, schema string) {
 	if len(od.ForeignKeys) != 1 || od.ForeignKeys[0].RefTable != "users" || od.ForeignKeys[0].OnDelete != "CASCADE" {
 		t.Fatalf("fk: %+v", od.ForeignKeys)
 	}
-	res, _, err = c.Browse(ctx, database, schema, "users", "", "id", false, 0, 10)
+	res, _, err = c.Browse(ctx, database, schema, "users", "", []SortKey{{Col: "id"}}, 0, 10)
 	must(err)
 	if res.Rows[0][1] != "Anna" {
 		t.Fatalf("data lost after rebuild: %v", res.Rows)
@@ -153,7 +153,7 @@ func exercise(t *testing.T, c *Conn, database, schema string) {
 	// clone everything into a fresh SQLite file and compare
 	dst := openSQLite(t)
 	must(Clone(ctx, c, database, tables, dst, "main", "", CloneOptions{WithData: true}, nil))
-	res, _, err = dst.Browse(ctx, "main", "main", "users", "", "id", false, 0, 10)
+	res, _, err = dst.Browse(ctx, "main", "main", "users", "", []SortKey{{Col: "id"}}, 0, 10)
 	must(err)
 	if len(res.Rows) != 2 || res.Rows[1][1] != "Jonas B" {
 		t.Fatalf("clone: %v", res.Rows)
@@ -270,7 +270,7 @@ func TestCloneSQLiteToMySQL(t *testing.T) {
 	if err := Clone(ctx, src, "main", tables, dst, name, "", CloneOptions{WithData: true}, nil); err != nil {
 		t.Fatal(err)
 	}
-	res, _, err := dst.Browse(ctx, name, "", "users", "", "id", false, 0, 10)
+	res, _, err := dst.Browse(ctx, name, "", "users", "", []SortKey{{Col: "id"}}, 0, 10)
 	if err != nil || len(res.Rows) != 1 || res.Rows[0][2] != "pending" {
 		t.Fatalf("%v %v", res.Rows, err)
 	}
