@@ -291,3 +291,5 @@ table.grid td.editing input.invalid { outline-color: var(--red); }
 .hex-dump { flex: 1; margin: 6px 8px; overflow: auto; font-size: 12px; color: var(--light-foreground); user-select: text; -webkit-user-select: text; }
 .cm-lint-marker-error, .cm-diagnostic-error { border-left-color: var(--red) !important; }
 .cm-tooltip-lint { background: var(--lighter-background) !important; color: var(--foreground); }
+.history-sql { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-item .sub { flex: none; }

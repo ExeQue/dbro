@@ -191,7 +191,8 @@ export class QueryTab {
     const list = h('div', { class: 'list' }, hist.length ? hist.map((e) => h('button', {
       type: 'button', class: 'list-item',
       onclick: () => { picked = e.sql; document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); },
-    }, h('span', { style: { whiteSpace: 'pre-wrap', overflow: 'hidden', maxHeight: '3.2em' } }, e.sql.slice(0, 300)), h('span', { class: 'sub' }, `${e.database} · ${new Date(e.time).toLocaleString()}`))) : h('p', { class: 'muted', style: { padding: '10px' } }, 'No history yet.'));
+      title: minify(e.sql),
+    }, h('span', { class: 'history-sql' }, minify(e.sql)), h('span', { class: 'sub' }, `${e.database} · ${new Date(e.time).toLocaleString()}`))) : h('p', { class: 'muted', style: { padding: '10px' } }, 'No history yet.'));
     await modal(`History for ${this.conn || 'this connection'}`, list, [{ label: 'Close' }], { wide: true });
     if (picked) this.setText(picked);
   }
