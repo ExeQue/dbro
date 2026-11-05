@@ -339,19 +339,20 @@ type Result struct {
 // run executes one statement and collects up to limit rows (0 = no limit).
 func (c *Conn) run(ctx context.Context, q querier, database, stmt string, limit int, args ...any) (Result, error) {
 	start := time.Now()
-	res := Result{SQL: stmt}
+	shown := c.interpolate(stmt, args)
+	res := Result{SQL: shown}
 	if !returnsRows(stmt) {
 		r, err := q.ExecContext(ctx, stmt, args...)
 		res.DurationMs = ms(start)
 		if err == nil {
 			res.Affected, _ = r.RowsAffected()
 		}
-		c.log(database, stmt, start, res.Affected, err)
+		c.log(database, shown, start, res.Affected, err)
 		return res, err
 	}
 	rows, err := q.QueryContext(ctx, stmt, args...)
 	if err != nil {
-		c.log(database, stmt, start, 0, err)
+		c.log(database, shown, start, 0, err)
 		return res, err
 	}
 	defer rows.Close()
@@ -374,7 +375,7 @@ func (c *Conn) run(ctx context.Context, q querier, database, stmt string, limit 
 			break
 		}
 		if err := rows.Scan(ptrs...); err != nil {
-			c.log(database, stmt, start, int64(len(res.Rows)), err)
+			c.log(database, shown, start, int64(len(res.Rows)), err)
 			return res, err
 		}
 		row := make([]any, len(vals))
@@ -386,7 +387,7 @@ func (c *Conn) run(ctx context.Context, q querier, database, stmt string, limit 
 	err = rows.Err()
 	res.DurationMs = ms(start)
 	res.Affected = int64(len(res.Rows))
-	c.log(database, stmt, start, res.Affected, err)
+	c.log(database, shown, start, res.Affected, err)
 	return res, err
 }
 
@@ -445,6 +446,38 @@ func (c *Conn) Query(ctx context.Context, database, sessionID, script string, li
 	var out []Result
 	for _, stmt := range SplitStatements(script) {
 		r, err := c.run(ctx, s, database, stmt, limit)
+		if err != nil {
+			r.Error = err.Error()
+			out = append(out, r)
+			return out, err
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+// QueryParams is Query with :name and ? placeholders bound as real statement parameters.
+// A nil map runs the script as it is.
+func (c *Conn) QueryParams(ctx context.Context, database, sessionID, script string, limit int, values map[string]any) ([]Result, error) {
+	if values == nil {
+		return c.Query(ctx, database, sessionID, script, limit)
+	}
+	s, err := c.session(ctx, database, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	var out []Result
+	for _, stmt := range SplitStatements(script) {
+		bound, args, err := c.Bind(stmt, values)
+		if err != nil {
+			return out, err
+		}
+		if c.Kind() == "postgres" && len(args) > 0 {
+			// untyped parameters ("SELECT :x IS NULL") would fail type inference in the extended
+			// protocol; pgx's simple protocol sends them as safely quoted literals instead
+			args = append([]any{pgx.QueryExecModeSimpleProtocol}, args...)
+		}
+		r, err := c.run(ctx, s, database, bound, limit, args...)
 		if err != nil {
 			r.Error = err.Error()
 			out = append(out, r)

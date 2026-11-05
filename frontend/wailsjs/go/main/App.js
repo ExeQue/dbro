@@ -130,6 +130,10 @@ export function PickNewFile(arg1) {
   return window['go']['main']['App']['PickNewFile'](arg1);
 }
 
+export function Placeholders(arg1) {
+  return window['go']['main']['App']['Placeholders'](arg1);
+}
+
 export function PlanSchema(arg1, arg2, arg3) {
   return window['go']['main']['App']['PlanSchema'](arg1, arg2, arg3);
 }
@@ -154,8 +158,8 @@ export function RoutineSource(arg1, arg2, arg3) {
   return window['go']['main']['App']['RoutineSource'](arg1, arg2, arg3);
 }
 
-export function RunQuery(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['RunQuery'](arg1, arg2, arg3, arg4, arg5);
+export function RunQuery(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['RunQuery'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function SaveConnection(arg1, arg2, arg3, arg4, arg5) {

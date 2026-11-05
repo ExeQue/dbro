@@ -70,6 +70,8 @@ export function PickFile(arg1:string,arg2:string):Promise<string>;
 
 export function PickNewFile(arg1:string):Promise<string>;
 
+export function Placeholders(arg1:string):Promise<Array<string>>;
+
 export function PlanSchema(arg1:string,arg2:string,arg3:Array<db.SchemaOp>):Promise<Array<string>>;
 
 export function PreviewCSV(arg1:string,arg2:string,arg3:boolean):Promise<main.CSVFile>;
@@ -82,7 +84,7 @@ export function ResolveLaravel(arg1:string):Promise<config.Connection>;
 
 export function RoutineSource(arg1:string,arg2:string,arg3:db.Routine):Promise<string>;
 
-export function RunQuery(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number):Promise<main.QueryRun>;
+export function RunQuery(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number,arg6:Record<string, any>):Promise<main.QueryRun>;
 
 export function SaveConnection(arg1:config.Connection,arg2:string,arg3:string,arg4:boolean,arg5:string):Promise<void>;
 

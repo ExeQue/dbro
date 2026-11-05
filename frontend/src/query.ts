@@ -6,7 +6,7 @@ import { sql, MySQL, PostgreSQL, SQLite, MariaSQL } from '@codemirror/lang-sql';
 import { syntaxHighlighting } from '@codemirror/language';
 import { highlight } from './highlight';
 import { prettify, minify } from './sqlformat';
-import { h, clear, icon, nextId, formatCount } from './util';
+import { h, clear, icon, nextId, formatCount, debounce } from './util';
 import { Go, forConn } from './api';
 import { Grid, nextSort } from './grid';
 import { dropdown, toast, prompt, modal, errorMessage, type MenuItem } from './dialogs';
@@ -30,6 +30,10 @@ export class QueryTab {
   private target = h('span', { class: 'muted' });
   private running = false;
   private grids: Grid[] = [];
+  private params = h('div', { class: 'params', hidden: true });
+  private names: string[] = [];
+  private values = new Map<string, string | null>();
+  private bind = h('input', { type: 'checkbox', checked: true, 'aria-label': 'Bind parameters' });
 
   constructor(n: number, sel: Selection | null, text = "") {
     this.title = `Query ${n}`;
@@ -50,6 +54,7 @@ export class QueryTab {
           syntaxHighlighting(highlight),
           placeholder('SELECT … — Ctrl+Enter runs the selection, or everything when nothing is selected'),
           EditorView.lineWrapping,
+          EditorView.updateListener.of((u) => u.docChanged && this.detect()),
         ],
       }),
     });
@@ -64,7 +69,9 @@ export class QueryTab {
         h('button', { type: 'button', class: 'btn', onclick: () => this.showHistory() }, icon('history', 12), 'History'),
         dropdown('Snippets', () => this.snippetMenu()),
         h('span', { class: 'spacer' }), this.target),
-      editorBox, split, this.results);
+      this.params, editorBox, split, this.results);
+    this.bind.addEventListener('change', () => this.renderParams());
+    this.detect();
     this.useSelection(sel);
     clear(this.results, h('div', { class: 'empty' }, 'Results appear here.'));
   }
@@ -99,6 +106,42 @@ export class QueryTab {
     return s.empty ? this.view.state.doc.toString() : this.view.state.sliceDoc(s.from, s.to);
   }
 
+  /** detect asks the backend which :name and ? parameters the script uses. */
+  private detect = debounce(async () => {
+    const names = await Go.Placeholders(this.view.state.doc.toString()).catch(() => []);
+    if (names.join('\u0000') === this.names.join('\u0000')) return;
+    this.names = names;
+    this.renderParams();
+  }, 300);
+
+  private renderParams() {
+    this.params.hidden = this.names.length === 0;
+    if (!this.names.length) return;
+    clear(this.params,
+      h('label', { class: 'check params-toggle', title: 'Send the values as prepared statement parameters' }, this.bind, ' Parameters'),
+      this.bind.checked ? this.names.map((n) => {
+        const label = /^\d+$/.test(n) ? '?' + n : ':' + n;
+        const v = this.values.get(n);
+        const input = h('input', { class: 'input', value: v ?? '', placeholder: v === null ? 'NULL' : '', 'aria-label': 'Value for ' + label, spellcheck: 'false', disabled: v === null });
+        input.addEventListener('input', () => this.values.set(n, input.value));
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) this.run();
+        });
+        const nul = h('button', { type: 'button', class: 'btn small' + (v === null ? ' on' : ''), 'aria-pressed': String(v === null), title: 'Bind NULL', onclick: () => {
+          this.values.set(n, this.values.get(n) === null ? '' : null);
+          this.renderParams();
+        } }, 'NULL');
+        return h('div', { class: 'param' }, h('code', {}, label), input, nul);
+      }) : h('span', { class: 'muted' }, 'Off: the SQL runs exactly as written.'),
+    );
+  }
+
+  /** paramValues returns the values to bind, or null when binding is off or not needed. */
+  private paramValues(): Record<string, string | null> | null {
+    if (!this.bind.checked || !this.names.length) return null;
+    return Object.fromEntries(this.names.map((n) => [n, this.values.has(n) ? this.values.get(n)! : '']));
+  }
+
   /** reformat prettifies or minifies the selection, or everything when nothing is selected. */
   private reformat(min: boolean) {
     const sel = this.view.state.selection.main;
@@ -124,7 +167,7 @@ export class QueryTab {
     this.setRunning(true);
     const started = performance.now();
     try {
-      const run = await forConn(this.conn, () => Go.RunQuery(this.conn, this.database, this.id, script, 0));
+      const run = await forConn(this.conn, () => Go.RunQuery(this.conn, this.database, this.id, script, 0, this.paramValues() as any));
       this.showResults(run.results ?? [], run.error, performance.now() - started);
     } catch (e) {
       this.showResults([], errorMessage(e), performance.now() - started);

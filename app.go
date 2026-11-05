@@ -472,7 +472,7 @@ type QueryRun struct {
 }
 
 // RunQuery runs a script on the tab's own session. Cancel it with CancelQuery(tabID).
-func (a *App) RunQuery(name, database, tabID, script string, limit int) (QueryRun, error) {
+func (a *App) RunQuery(name, database, tabID, script string, limit int, params map[string]any) (QueryRun, error) {
 	c, err := a.conn(name)
 	if err != nil {
 		return QueryRun{}, err
@@ -488,7 +488,7 @@ func (a *App) RunQuery(name, database, tabID, script string, limit int) (QueryRu
 		a.mu.Unlock()
 	}()
 	history.Add(name, database, script)
-	rs, err := c.Query(ctx, database, tabID, script, limit)
+	rs, err := c.QueryParams(ctx, database, tabID, script, limit, params)
 	run := QueryRun{Results: rs}
 	if run.Results == nil {
 		run.Results = []db.Result{}
@@ -501,6 +501,15 @@ func (a *App) RunQuery(name, database, tabID, script string, limit int) (QueryRu
 		}
 	}
 	return run, nil
+}
+
+// Placeholders lists the :name and ? parameters a script uses.
+func (a *App) Placeholders(script string) []string {
+	p := db.Placeholders(script)
+	if p == nil {
+		p = []string{}
+	}
+	return p
 }
 
 // CancelQuery stops a running query.

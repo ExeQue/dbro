@@ -293,3 +293,8 @@ table.grid td.editing input.invalid { outline-color: var(--red); }
 .cm-tooltip-lint { background: var(--lighter-background) !important; color: var(--foreground); }
 .history-sql { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .list-item .sub { flex: none; }
+.params { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--dark-background); flex: none; }
+.param { display: flex; align-items: center; gap: 6px; }
+.param code { color: var(--yellow); }
+.param .input { width: 170px; min-height: 26px; }
+.btn.on { background: var(--selection); border-color: var(--accent); }
