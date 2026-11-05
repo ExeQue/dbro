@@ -2,7 +2,8 @@
 import { EditorView, keymap, placeholder } from '@codemirror/view';
 import { EditorState, Compartment, Prec } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
-import { sql, MySQL, PostgreSQL, SQLite, MariaSQL } from '@codemirror/lang-sql';
+import { sql, MySQL, PostgreSQL, SQLite, MariaSQL, keywordCompletionSource, schemaCompletionSource, type SQLDialect } from '@codemirror/lang-sql';
+import { autocompletion, type CompletionContext, type CompletionSource } from '@codemirror/autocomplete';
 import { syntaxHighlighting } from '@codemirror/language';
 import { highlight } from './highlight';
 import { prettify, minify } from './sqlformat';
@@ -23,6 +24,8 @@ export class QueryTab {
   database = '';
   private view: EditorView;
   private lang = new Compartment();
+  private complete = new Compartment();
+  private columns: string[] = [];
   private results = h('div', { class: 'results' });
   private status = h('span', { class: 'muted' });
   private runBtn: HTMLButtonElement;
@@ -51,6 +54,7 @@ export class QueryTab {
           ])),
           basicSetup,
           this.lang.of(sql()),
+          Prec.highest(this.complete.of(autocompletion({ override: this.sources(MySQL, {}) }))),
           syntaxHighlighting(highlight),
           placeholder('SELECT … — Ctrl+Enter runs the selection, or everything when nothing is selected'),
           EditorView.lineWrapping,
@@ -88,10 +92,11 @@ export class QueryTab {
     const driver = connInfo(sel.conn)?.driver;
     const dial = d === 'postgres' ? PostgreSQL : d === 'sqlite' ? SQLite : driver === 'mariadb' ? MariaSQL : MySQL;
     this.target.textContent = `${this.conn}${this.database ? ' / ' + this.database : ''}`;
-    this.view.dispatch({ effects: this.lang.reconfigure(sql({ dialect: dial, upperCaseKeywords: true })) });
+    this.view.dispatch({ effects: [this.lang.reconfigure(sql({ dialect: dial, upperCaseKeywords: true })), this.complete.reconfigure(autocompletion({ override: this.sources(dial, {}) }))] });
     if (this.database) {
       forConn(this.conn, () => Go.Completions(this.conn, this.database)).then((schema) => {
-        this.view.dispatch({ effects: this.lang.reconfigure(sql({ dialect: dial, schema, upperCaseKeywords: true })) });
+        this.columns = [...new Set(Object.values(schema).flat())].sort();
+        this.view.dispatch({ effects: [this.lang.reconfigure(sql({ dialect: dial, schema, upperCaseKeywords: true })), this.complete.reconfigure(autocompletion({ override: this.sources(dial, schema) }))] });
       }).catch(() => {});
     }
   }
@@ -104,6 +109,25 @@ export class QueryTab {
   private text() {
     const s = this.view.state.selection.main;
     return s.empty ? this.view.state.doc.toString() : this.view.state.sliceDoc(s.from, s.to);
+  }
+
+  /** sources completes :parameters after a colon and SQL keywords and schema everywhere else. */
+  private sources(dial: SQLDialect, schema: Record<string, string[]>): CompletionSource[] {
+    const param = (ctx: CompletionContext) => ctx.matchBefore(/(^|[^:\w]):\w*$/);
+    const guard = (src: CompletionSource): CompletionSource => (ctx) => (param(ctx) ? null : src(ctx));
+    const params: CompletionSource = (ctx) => {
+      const m = param(ctx);
+      if (!m) return null;
+      const from = m.from + m.text.indexOf(':');
+      const typed = ctx.state.sliceDoc(from + 1, ctx.pos);
+      const used = this.names.filter((n) => !/^\d+$/.test(n) && n !== typed);
+      const options = [
+        ...used.map((n) => ({ label: ':' + n, type: 'variable', detail: 'parameter', boost: 2 })),
+        ...this.columns.filter((c) => !used.includes(c)).map((c) => ({ label: ':' + c, type: 'property', detail: 'column' })),
+      ];
+      return { from, options, validFor: /^:\w*$/ };
+    };
+    return [params, guard(keywordCompletionSource(dial, true)), guard(schemaCompletionSource({ dialect: dial, schema }))];
   }
 
   /** detect asks the backend which :name and ? parameters the script uses. */
