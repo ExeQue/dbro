@@ -1,10 +1,11 @@
-// Package mcpserver exposes dbro's saved connections to agents over MCP (stdio).
+// Package mcpserver exposes dbro's saved connections to agents over MCP (stdio or streamable HTTP).
 package mcpserver
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -194,4 +195,10 @@ func New(version string) *mcp.Server {
 // Run serves MCP over stdio until the client disconnects.
 func Run(ctx context.Context, version string) error {
 	return New(version).Run(ctx, &mcp.StdioTransport{})
+}
+
+// Handler serves MCP over streamable HTTP.
+func Handler(version string) http.Handler {
+	s := New(version)
+	return mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return s }, nil)
 }

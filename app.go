@@ -35,6 +35,9 @@ type App struct {
 	themeCancel  context.CancelFunc
 	unknownHosts map[string]*sshtunnel.UnknownHostError
 	stop         chan struct{}
+
+	// headless is set by "dbro serve": events go to web clients and there is no Wails runtime.
+	headless func(event string, data any)
 }
 
 // NewApp creates the app.
@@ -44,10 +47,19 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	sqllog.Listen(func(e sqllog.Entry) { runtime.EventsEmit(a.ctx, "log", e) })
-	go sqllog.Tail("mcp", time.Second, a.stop, func(e sqllog.Entry) { runtime.EventsEmit(a.ctx, "log", e) })
+	sqllog.Listen(func(e sqllog.Entry) { a.emit("log", e) })
+	go sqllog.Tail("mcp", time.Second, a.stop, func(e sqllog.Entry) { a.emit("log", e) })
 	s, _ := config.LoadSettings()
 	a.watchTheme(s.Theme)
+}
+
+// emit sends an event to the frontend.
+func (a *App) emit(event string, data any) {
+	if a.headless != nil {
+		a.headless(event, data)
+		return
+	}
+	runtime.EventsEmit(a.ctx, event, data)
 }
 
 func (a *App) shutdown(context.Context) {
@@ -133,7 +145,7 @@ func (a *App) watchTheme(id string) {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.themeCancel = cancel
 	a.mu.Unlock()
-	theme.Watch(ctx, id, func(t theme.Theme) { runtime.EventsEmit(a.ctx, "theme", t) })
+	theme.Watch(ctx, id, func(t theme.Theme) { a.emit("theme", t) })
 }
 
 // SetTheme switches theme, saves the choice and starts live sync for it.
@@ -593,7 +605,7 @@ func (a *App) ApplySchema(name, database string, stmts []string) error {
 // ---- files: export, import, dump, clone ----
 
 func (a *App) progress(task, text string) {
-	runtime.EventsEmit(a.ctx, "progress", map[string]string{"task": task, "text": text})
+	a.emit("progress", map[string]string{"task": task, "text": text})
 }
 
 func filters(format string) []runtime.FileFilter {
@@ -780,11 +792,16 @@ func portalFilters(fs []runtime.FileFilter) []portal.Filter {
 	return out
 }
 
+var errNoChooser = errors.New("no file chooser on the server: run dbro on a desktop session to pick files")
+
 // openDialog uses the desktop's file chooser portal, falling back to Wails' GTK dialog.
 func (a *App) openDialog(dir bool, o runtime.OpenDialogOptions) (string, error) {
 	p, err := portal.OpenFile(o.Title, portalFilters(o.Filters), dir)
 	if !errors.Is(err, portal.ErrUnavailable) {
 		return p, err
+	}
+	if a.headless != nil {
+		return "", errNoChooser
 	}
 	if dir {
 		return runtime.OpenDirectoryDialog(a.ctx, o)
@@ -797,6 +814,9 @@ func (a *App) saveDialog(o runtime.SaveDialogOptions) (string, error) {
 	p, err := portal.SaveFile(o.Title, o.DefaultFilename, portalFilters(o.Filters))
 	if !errors.Is(err, portal.ErrUnavailable) {
 		return p, err
+	}
+	if a.headless != nil {
+		return "", errNoChooser
 	}
 	return runtime.SaveFileDialog(a.ctx, o)
 }

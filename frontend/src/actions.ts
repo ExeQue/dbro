@@ -488,7 +488,8 @@ export async function settings() {
     h('label', { class: 'check' }, lerdConnect, ' Connect to lerd on startup'),
     h('fieldset', {}, h('legend', {}, 'MCP server for agents'),
       h('p', { class: 'muted' }, 'Agents get read-only access to your saved connections. Writes need "Allow agents to change data" on the connection.'),
-      h('div', { style: { display: 'flex', gap: '6px' } }, h('code', { style: { flex: '1', userSelect: 'all' } }, mcpCmd), h('button', { type: 'button', class: 'btn small', onclick: () => { Go.CopyText(mcpCmd); toast('Copied'); } }, 'Copy'))),
+      h('div', { style: { display: 'flex', gap: '6px' } }, h('code', { style: { flex: '1', userSelect: 'all' } }, mcpCmd), h('button', { type: 'button', class: 'btn small', onclick: () => { Go.CopyText(mcpCmd); toast('Copied'); } }, 'Copy')),
+      h('p', { class: 'muted' }, 'Over HTTP: ', h('code', {}, `${exe} mcp --http`), ' or the headless ', h('code', {}, `${exe} serve`), ' (also at /mcp).')),
   ), [{ label: 'Cancel' }, { label: 'Save', primary: true, action: async () => {
     const s = { ...boot.settings, lerd: lerd.checked, lerdAutoConnect: lerdConnect.checked, font: font.value.trim(), queryTimeout: Number(timeout.value) || 30 };
     await Go.SaveSettings(s as any);

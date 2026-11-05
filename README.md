@@ -11,7 +11,8 @@
 - **Query tabs** with CodeMirror, autocomplete for tables and columns, several result sets, EXPLAIN, a per-connection history and saved snippets.
 - **Import and export**: tables and results to CSV, JSON or SQL; full SQL dumps; SQL and CSV import; **Clone to** another database or connection, across drivers.
 - **Themes**: dbro Dark and Light (picked from your system preference on first start), Tokyo Night, Catppuccin, Gruvbox, Nord, your own in `~/.config/dbro/themes/*.toml`, or live sync with Omarchy.
-- **MCP server** for agents: read-only by default, writes only on connections you allow, connections can be hidden.
+- **MCP server** for agents (stdio or streamable HTTP): read-only by default, writes only on connections you allow, connections can be hidden.
+- **Headless mode**: `dbro serve` puts the app in a web browser on a port, embeddable in other applications.
 
 ## Install
 
@@ -37,10 +38,26 @@ logo_ink = "#20242c"    # sunglasses and smile
 ## MCP for agents
 
 ```sh
-claude mcp add dbro -- dbro mcp
+claude mcp add dbro -- dbro mcp                                   # stdio
+dbro mcp --http                                                   # streamable HTTP on 127.0.0.1:7811
+claude mcp add --transport http dbro http://127.0.0.1:7811/mcp
 ```
 
 Tools: `list_connections`, `list_databases`, `list_tables`, `describe_table`, `query` (always in a read-only transaction) and `execute` (only where *Allow agents to change data* is on). Agent statements appear in the app's SQL log marked `[mcp]`.
+
+## Headless mode
+
+`dbro serve` runs the app without a window: open the printed URL in any browser. MCP is served at `/mcp` on the same port.
+
+```sh
+dbro serve                                  # http://127.0.0.1:7810/
+DBRO_TOKEN=secret dbro serve --addr 0.0.0.0:7810
+```
+
+- On loopback without a token, only `localhost`/`127.0.0.1` host names are accepted and the UI cannot be framed by other sites.
+- With a token (set `DBRO_TOKEN`; generated automatically beyond loopback), the API, events and MCP need `Authorization: Bearer <token>` or `?token=`. Any application that knows the token can embed the UI: `<iframe src="http://127.0.0.1:7810/?token=secret">`.
+- Plain HTTP: put a TLS proxy in front when you listen beyond your own machine.
+- File pickers (import, export, dump) use the desktop portal of the machine dbro runs on, so they only work when `dbro serve` runs in a desktop session.
 
 ## Files
 

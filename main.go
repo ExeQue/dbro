@@ -27,18 +27,35 @@ const usage = `dbro: a simple SQL browser for Linux.
 Usage:
   dbro            open the app
   dbro mcp        serve saved connections to agents over MCP (stdio)
+  dbro mcp --http [--addr 127.0.0.1:7811]
+                  serve MCP over streamable HTTP at /mcp
+  dbro serve [--addr 127.0.0.1:7810]
+                  headless: the app in a web browser, plus MCP at /mcp
   dbro version    print the version
+
+Beyond loopback a token is required: set DBRO_TOKEN, or dbro prints a fresh one.
 
 Add to Claude Code:
   claude mcp add dbro -- dbro mcp
+  claude mcp add --transport http dbro http://127.0.0.1:7811/mcp
 `
 
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "mcp":
-			if err := mcpserver.Run(context.Background(), version); err != nil {
+			run := func() error { return mcpserver.Run(context.Background(), version) }
+			if len(os.Args) > 2 && os.Args[2] == "--http" {
+				run = func() error { return serveMCP(os.Args[3:]) }
+			}
+			if err := run(); err != nil {
 				fmt.Fprintln(os.Stderr, "dbro mcp:", err)
+				os.Exit(1)
+			}
+			return
+		case "serve":
+			if err := serveHeadless(os.Args[2:]); err != nil {
+				fmt.Fprintln(os.Stderr, "dbro serve:", err)
 				os.Exit(1)
 			}
 			return
