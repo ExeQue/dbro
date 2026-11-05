@@ -33,7 +33,7 @@ export class QueryTab {
   private target = h('span', { class: 'muted' });
   private running = false;
   private grids: Grid[] = [];
-  private params = h('div', { class: 'params', hidden: true });
+  private params = h('div', { class: 'params' });
   private names: string[] = []; // parameters the query uses
   private extra: string[] = []; // parameters added by hand, used or not
   private values = new Map<string, string | null>();
@@ -72,12 +72,12 @@ export class QueryTab {
         h('button', { type: 'button', class: 'btn', onclick: () => this.explain() }, 'Explain'),
         h('button', { type: 'button', class: 'btn', title: 'Prettify (Ctrl+Shift+F)', onclick: () => this.reformat(false) }, 'Prettify'),
         h('button', { type: 'button', class: 'btn', title: 'Minify', onclick: () => this.reformat(true) }, 'Minify'),
-        h('button', { type: 'button', class: 'btn', title: 'Add a :parameter before using it', onclick: () => this.addParam() }, icon('plus', 12), 'Parameter'),
         h('button', { type: 'button', class: 'btn', onclick: () => this.showHistory() }, icon('history', 12), 'History'),
         dropdown('Snippets', () => this.snippetMenu()),
         h('span', { class: 'spacer' }), this.target),
       this.params, editorBox, split, this.results);
     this.bind.addEventListener('change', () => this.renderParams());
+    this.renderParams();
     this.detect();
     this.useSelection(sel);
     clear(this.results, h('div', { class: 'empty' }, 'Results appear here.'));
@@ -146,56 +146,87 @@ export class QueryTab {
     return [...this.names, ...this.extra.filter((n) => !this.names.includes(n))];
   }
 
-  private async addParam() {
-    const name = (await prompt('New parameter', 'Name (use it as :name in the query)'))?.trim().replace(/^:/, '');
-    if (!name) return;
-    if (!/^[A-Za-z_]\w*$/.test(name)) return toast('A parameter name is letters, digits and _', 'error');
-    if (!this.extra.includes(name)) this.extra.push(name);
-    if (!this.values.has(name)) this.values.set(name, '');
-    this.bind.checked = true;
-    this.renderParams();
-    (this.params.querySelector(`input[data-param="${name}"]`) as HTMLInputElement | null)?.focus();
-  }
-
+  /** renderParams draws the key/value list above the editor: the query's parameters, hand-added ones and an empty row to add more. */
   private renderParams() {
     const all = this.allParams();
-    this.params.hidden = all.length === 0;
-    if (!all.length) return;
-    clear(this.params,
-      h('label', { class: 'check params-toggle', title: 'Send the values as prepared statement parameters' }, this.bind, ' Parameters'),
-      this.bind.checked ? all.map((n) => {
-        const label = /^\d+$/.test(n) ? '?' + n : ':' + n;
-        const used = this.names.includes(n);
-        const v = this.values.get(n);
-        const type = this.types.get(n) ?? 'auto';
-        const typeSel = h('select', { class: 'input param-type', 'aria-label': 'Type of ' + label, title: 'How the value is sent' },
-          (['auto', 'text', 'integer', 'decimal', 'boolean'] as ParamType[]).map((t) => h('option', { value: t, selected: t === type }, t[0].toUpperCase() + t.slice(1))));
-        typeSel.addEventListener('change', () => {
-          this.types.set(n, typeSel.value as ParamType);
-          if (typeSel.value === 'boolean' && !['true', 'false'].includes(this.values.get(n) ?? '')) this.values.set(n, 'true');
-          this.renderParams();
+    const valid = (name: string) => /^[A-Za-z_]\w*$/.test(name);
+    const row = (n: string | null) => {
+      const used = n !== null && this.names.includes(n);
+      const label = n === null ? '' : /^\d+$/.test(n) ? '?' + n : ':' + n;
+      const key = n === null || !used
+        ? h('input', { class: 'input param-name', value: n ?? '', placeholder: n === null ? 'new parameter' : '', 'aria-label': n === null ? 'New parameter name' : 'Name of ' + label, spellcheck: 'false' })
+        : h('code', { class: 'param-name' }, label);
+      const type = (n !== null && this.types.get(n)) || 'auto';
+      const v = n === null ? '' : this.values.has(n) ? this.values.get(n)! : '';
+      const typeSel = h('select', { class: 'input param-type', 'aria-label': 'Type of ' + (label || 'new parameter') },
+        (['auto', 'text', 'integer', 'decimal', 'boolean'] as ParamType[]).map((t) => h('option', { value: t, selected: t === type }, t[0].toUpperCase() + t.slice(1))));
+      const value: HTMLInputElement | HTMLSelectElement = type === 'boolean' && v !== null
+        ? h('select', { class: 'input param-value', 'aria-label': 'Value for ' + label, 'data-param': n ?? '' }, ['true', 'false'].map((b) => h('option', { value: b, selected: v === b }, b)))
+        : h('input', { class: 'input param-value', value: v ?? '', placeholder: v === null ? 'NULL' : 'value', 'aria-label': 'Value for ' + (label || 'new parameter'), spellcheck: 'false', disabled: v === null, 'data-param': n ?? '' });
+      const check = () => value.classList.toggle('invalid', v !== null && value.value !== '' && typed(value.value, typeSel.value as ParamType) === undefined);
+      check();
+
+      // the empty row becomes a parameter as soon as its name is committed
+      const create = (focusValue: boolean) => {
+        const name = (key as HTMLInputElement).value.trim().replace(/^:/, '');
+        if (!name) return;
+        if (!valid(name)) return toast('A parameter name is letters, digits and _', 'error');
+        if (!this.extra.includes(name) && !this.names.includes(name)) this.extra.push(name);
+        if (value.value !== '' || !this.values.has(name)) this.values.set(name, value.value);
+        this.types.set(name, typeSel.value as ParamType);
+        this.renderParams();
+        if (focusValue) (this.params.querySelector(`[data-param="${name}"]`) as HTMLElement | null)?.focus();
+      };
+      const rename = () => {
+        const name = (key as HTMLInputElement).value.trim().replace(/^:/, '');
+        if (n === null || name === n) return;
+        if (!valid(name)) {
+          (key as HTMLInputElement).value = n;
+          return toast('A parameter name is letters, digits and _', 'error');
+        }
+        this.extra = this.extra.map((x) => (x === n ? name : x));
+        this.values.set(name, this.values.get(n) ?? '');
+        this.types.set(name, this.types.get(n) ?? 'auto');
+        this.renderParams();
+      };
+      if (key instanceof HTMLInputElement) {
+        key.addEventListener('keydown', (e) => {
+          if (n === null && (e.key === 'Enter' || e.key === 'Tab') && key.value.trim()) {
+            e.preventDefault();
+            create(true);
+          } else if (n !== null && e.key === 'Enter') rename();
         });
-        const input: HTMLInputElement | HTMLSelectElement = type === 'boolean' && v !== null
-          ? h('select', { class: 'input', 'aria-label': 'Value for ' + label, 'data-param': n }, ['true', 'false'].map((b) => h('option', { value: b, selected: v === b }, b)))
-          : h('input', { class: 'input', value: v ?? '', placeholder: v === null ? 'NULL' : '', 'aria-label': 'Value for ' + label, spellcheck: 'false', disabled: v === null, 'data-param': n, inputmode: type === 'integer' || type === 'decimal' ? 'decimal' : undefined });
-        const check = () => input.classList.toggle('invalid', typed(input.value, type) === undefined && v !== null);
-        input.addEventListener('input', () => { this.values.set(n, input.value); check(); });
-        input.addEventListener('change', () => this.values.set(n, input.value));
+        key.addEventListener('change', () => (n === null ? create(false) : rename()));
+      }
+      typeSel.addEventListener('change', () => {
+        if (n === null) return;
+        this.types.set(n, typeSel.value as ParamType);
+        if (typeSel.value === 'boolean' && !['true', 'false'].includes(this.values.get(n) ?? '')) this.values.set(n, 'true');
+        this.renderParams();
+      });
+      value.addEventListener('input', () => {
+        if (n !== null) this.values.set(n, value.value);
         check();
-        input.addEventListener('keydown', (e: Event) => {
-          const k = e as KeyboardEvent;
-          if (k.key === 'Enter' && (k.ctrlKey || k.metaKey)) this.run();
-        });
-        const nul = h('button', { type: 'button', class: 'btn small' + (v === null ? ' on' : ''), 'aria-pressed': String(v === null), title: 'Bind NULL', onclick: () => {
-          this.values.set(n, this.values.get(n) === null ? '' : null);
-          this.renderParams();
-        } }, 'NULL');
-        const remove = used ? null : h('button', { type: 'button', class: 'btn icon small', 'aria-label': 'Remove ' + label, title: 'Not used in the query yet', onclick: () => {
-          this.extra = this.extra.filter((x) => x !== n);
-          this.renderParams();
-        } }, icon('x', 11));
-        return h('div', { class: 'param' + (used ? '' : ' unused') }, h('code', {}, label), typeSel, input, nul, remove, used ? null : h('span', { class: 'muted' }, 'unused'));
-      }) : h('span', { class: 'muted' }, 'Off: the SQL runs exactly as written.'),
+      });
+      value.addEventListener('change', () => n !== null && this.values.set(n, value.value));
+      value.addEventListener('keydown', (e: Event) => {
+        const k = e as KeyboardEvent;
+        if (k.key === 'Enter' && (k.ctrlKey || k.metaKey)) this.run();
+        else if (k.key === 'Enter' && n === null) create(false);
+      });
+      const nul = n === null ? h('span') : h('button', { type: 'button', class: 'btn small' + (v === null ? ' on' : ''), 'aria-pressed': String(v === null), title: 'Bind NULL', onclick: () => {
+        this.values.set(n, this.values.get(n) === null ? '' : null);
+        this.renderParams();
+      } }, 'NULL');
+      const remove = n === null || used ? h('span') : h('button', { type: 'button', class: 'btn icon small', 'aria-label': 'Remove ' + label, title: 'Remove', onclick: () => {
+        this.extra = this.extra.filter((x) => x !== n);
+        this.renderParams();
+      } }, icon('x', 11));
+      return h('div', { class: 'param' + (n !== null && !used ? ' unused' : '') + (n === null ? ' new' : ''), title: n !== null && !used ? 'Not used in the query yet' : undefined }, key, typeSel, value, nul, remove);
+    };
+    clear(this.params,
+      h('label', { class: 'check params-toggle', title: 'Send the values as prepared statement parameters' }, this.bind, ` Parameters${all.length ? ` (${all.length})` : ''}`),
+      this.bind.checked ? h('div', { class: 'param-list' }, all.map(row), row(null)) : h('span', { class: 'muted' }, 'Off: the SQL runs exactly as written.'),
     );
   }
 

@@ -293,11 +293,13 @@ table.grid td.editing input.invalid { outline-color: var(--red); }
 .cm-tooltip-lint { background: var(--lighter-background) !important; color: var(--foreground); }
 .history-sql { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .list-item .sub { flex: none; }
-.params { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--dark-background); flex: none; }
-.param { display: flex; align-items: center; gap: 6px; }
+.params { display: flex; flex-direction: column; gap: 4px; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--dark-background); flex: none; max-height: 30vh; overflow-y: auto; }
+.param-list { display: grid; gap: 4px; }
+.param { display: grid; grid-template-columns: minmax(110px, 200px) 92px minmax(120px, 1fr) 52px 26px; align-items: center; gap: 6px; }
+.param code.param-name { padding: 0 9px; }
+.param.new .param-name { border-style: dashed; }
 .param code { color: var(--yellow); }
-.param .input { width: 170px; min-height: 26px; }
+.param .input { width: 100%; min-height: 26px; }
 .btn.on { background: var(--selection); border-color: var(--accent); }
 .param.unused code { color: var(--dark-foreground); }
-.param .param-type { width: 92px; }
 .param .input.invalid { border-color: var(--red); }
