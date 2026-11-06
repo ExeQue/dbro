@@ -127,6 +127,43 @@ make install        # builds and installs to ~/.local (binary, .desktop file, ic
 
 ## Themes
 
+The built-in themes:
+
+<table>
+  <tr>
+    <td><img src="assets/screenshots/theme-dbro-dark.png" alt="dbro with the dbro Dark theme"></td>
+    <td><img src="assets/screenshots/theme-dbro-light.png" alt="dbro with the dbro Light theme"></td>
+  </tr>
+  <tr>
+    <td align="center">dbro Dark</td>
+    <td align="center">dbro Light</td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/theme-tokyo-night.png" alt="dbro with the Tokyo Night theme"></td>
+    <td><img src="assets/screenshots/theme-nord.png" alt="dbro with the Nord theme"></td>
+  </tr>
+  <tr>
+    <td align="center">Tokyo Night</td>
+    <td align="center">Nord</td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/theme-catppuccin-mocha.png" alt="dbro with the Catppuccin Mocha theme"></td>
+    <td><img src="assets/screenshots/theme-catppuccin-latte.png" alt="dbro with the Catppuccin Latte theme"></td>
+  </tr>
+  <tr>
+    <td align="center">Catppuccin Mocha</td>
+    <td align="center">Catppuccin Latte</td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/theme-gruvbox-dark.png" alt="dbro with the Gruvbox Dark theme"></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td align="center">Gruvbox Dark</td>
+    <td align="center">or your own, or live Omarchy sync</td>
+  </tr>
+</table>
+
 A theme is an Omarchy `colors.toml`: `mode`, `accent`, `background`, `foreground`, `selection`, the ANSI colors and so on. Missing keys come from dbro Dark or dbro Light. The logo follows `accent`; a theme can recolor it with optional keys:
 
 ```toml

@@ -23,9 +23,11 @@ const shot = async (name) => {
 // jump anywhere through the command palette
 const go = async (text) => {
   await page.keyboard.press('Control+k');
-  await page.locator('.palette').waitFor();
+  await page.locator('.dialog input:focus').waitFor(); // the dialog focuses its input right after it opens
   await page.keyboard.insertText(text);
   await settle();
+  const picked = (await page.locator('.palette .list-item.on').textContent()) ?? '';
+  if (!picked.startsWith(text)) throw new Error(`palette picked "${picked}" for "${text}"`);
   await page.keyboard.press('Enter');
   await settle();
 };
@@ -55,6 +57,7 @@ await shot('data');
 
 // 2. command palette
 await page.keyboard.press('Control+k');
+await page.locator('.dialog input:focus').waitFor();
 await page.keyboard.insertText('ord');
 await shot('palette');
 await page.keyboard.press('Escape');
@@ -77,5 +80,15 @@ await page.locator('[data-param="country"]').fill('DK');
 await page.keyboard.press('Control+Enter');
 await page.locator('.query table.grid').last().waitFor();
 await shot('query');
+
+// 5. every built-in theme, on the data view, at 1x to keep the files small
+await page.getByRole('tab', { name: 'Data' }).click();
+const themes = (await page.evaluate(() => window.go.main.App.ListThemes())).filter((t) => t.source === 'builtin');
+for (const t of themes) {
+  await go(`Theme: ${t.name}`);
+  await settle();
+  await page.screenshot({ path: `${out}/theme-${t.id}.png`, scale: 'css' });
+  console.log(`saved theme-${t.id}.png`);
+}
 
 await browser.close();
