@@ -17,20 +17,68 @@
 
 ## Install
 
-- **Arch Linux** (and Omarchy): `yay -S dbro-bin` from the AUR.
+Builds for every release are on [Releases](https://github.com/ExeQue/dbro/releases): Linux (amd64, arm64), macOS (universal: Apple Silicon and Intel) and Windows (amd64, also runs on Windows on Arm). lerd and Omarchy integration only apply on Linux; everything else works everywhere.
 
-Or download a build from [Releases](https://github.com/ExeQue/dbro/releases):
+### Linux
 
-- **Linux** (amd64, arm64): needs `webkit2gtk-4.1` (already on Omarchy). Unpack, then
-  ```sh
-  install -Dm755 dbro ~/.local/bin/dbro
-  install -Dm644 dbro.desktop ~/.local/share/applications/dbro.desktop
-  install -Dm644 dbro.png ~/.local/share/icons/hicolor/1024x1024/apps/dbro.png
-  ```
-- **macOS** (universal): move `dbro.app` to Applications. The build is not notarized, so clear the quarantine flag once: `xattr -dr com.apple.quarantine /Applications/dbro.app`. For the CLI (`dbro mcp`, `dbro serve`), link it onto your PATH: `ln -s /Applications/dbro.app/Contents/MacOS/dbro /usr/local/bin/dbro`.
-- **Windows** (amd64): unpack `dbro.exe` somewhere permanent, e.g. `%LOCALAPPDATA%\Programs\dbro`, and run it. It needs the WebView2 runtime (part of Windows 11). The build is not signed, so SmartScreen asks once (More info, Run anyway). For agents, use the full path: `claude mcp add dbro -- "%LOCALAPPDATA%\Programs\dbro\dbro.exe" mcp`.
+Needs GTK 3 and WebKitGTK 4.1, and glibc 2.35 or newer: Ubuntu 22.04, 24.04 and 26.04, Debian 12 and 13, Fedora 36 and later, any current Arch. Every release is checked to start on those Ubuntu and Debian versions.
 
-lerd and Omarchy integration only apply on Linux; everything else works on all three.
+| Distribution | Dependencies |
+|---|---|
+| Ubuntu, Debian, Mint, Pop!_OS | `sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0` |
+| Fedora | `sudo dnf install gtk3 webkit2gtk4.1` |
+| openSUSE | `sudo zypper install libgtk-3-0 libwebkit2gtk-4_1-0` |
+| Arch, Omarchy, Manjaro | `sudo pacman -S --needed gtk3 webkit2gtk-4.1` |
+
+Then install the latest release into `~/.local` (picks amd64 or arm64 for you):
+
+```sh
+arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+ver=$(curl -fsSL https://api.github.com/repos/ExeQue/dbro/releases/latest | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
+curl -fsSL "https://github.com/ExeQue/dbro/releases/download/$ver/dbro-$ver-linux-$arch.tar.gz" | tar -xz -C /tmp
+cd "/tmp/dbro-$ver-linux-$arch"
+install -Dm755 dbro ~/.local/bin/dbro
+install -Dm644 dbro.desktop ~/.local/share/applications/dbro.desktop
+install -Dm644 dbro.png ~/.local/share/icons/hicolor/1024x1024/apps/dbro.png
+```
+
+Make sure `~/.local/bin` is on your `PATH`. To uninstall, delete those three files.
+
+**Arch, Omarchy, Manjaro**: or build a proper package from the included PKGBUILD, so pacman tracks the files and the dependencies:
+
+```sh
+git clone https://github.com/ExeQue/dbro && cd dbro/packaging/aur/dbro-bin && makepkg -si
+```
+
+### macOS
+
+macOS 12 or newer (the Go runtime requires it). The build is not notarized, so the quarantine flag has to be cleared once:
+
+```sh
+ver=$(curl -fsSL https://api.github.com/repos/ExeQue/dbro/releases/latest | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
+curl -fsSLo /tmp/dbro.zip "https://github.com/ExeQue/dbro/releases/download/$ver/dbro-$ver-macos-universal.zip"
+unzip -oq /tmp/dbro.zip -d /Applications
+xattr -dr com.apple.quarantine /Applications/dbro.app
+sudo ln -sf /Applications/dbro.app/Contents/MacOS/dbro /usr/local/bin/dbro   # optional: the CLI for dbro mcp / dbro serve
+```
+
+### Windows
+
+Windows 10 or 11 with the WebView2 runtime (built into Windows 11; on Windows 10 it comes with Edge). In PowerShell:
+
+```powershell
+$ver = (Invoke-RestMethod https://api.github.com/repos/ExeQue/dbro/releases/latest).tag_name
+$dir = "$env:LOCALAPPDATA\Programs\dbro"
+Invoke-WebRequest "https://github.com/ExeQue/dbro/releases/download/$ver/dbro-$ver-windows-amd64.zip" -OutFile "$env:TEMP\dbro.zip"
+Expand-Archive "$env:TEMP\dbro.zip" $dir -Force
+# Start menu shortcut
+$lnk = (New-Object -ComObject WScript.Shell).CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\dbro.lnk")
+$lnk.TargetPath = "$dir\dbro.exe"; $lnk.Save()
+# optional: dbro on PATH for dbro mcp / dbro serve
+[Environment]::SetEnvironmentVariable('Path', [Environment]::GetEnvironmentVariable('Path', 'User') + ";$dir", 'User')
+```
+
+The build is not signed, so SmartScreen asks on first start (More info, Run anyway).
 
 ### From source
 

@@ -13,10 +13,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # the oldest Ubuntu with webkit2gtk-4.1, so the binary runs on glibc 2.35 and newer
           - target: linux-amd64
-            runner: ubuntu-24.04
+            runner: ubuntu-22.04
           - target: linux-arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
           - target: macos-universal
             runner: macos-15
           - target: windows-amd64
@@ -76,8 +77,27 @@ jobs:
             dist/*.tar.gz*
             dist/*.zip*
 
-  release:
+  # the Linux binary must load on every distribution the README promises
+  smoke:
     needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["ubuntu:22.04", "ubuntu:24.04", "ubuntu:26.04", "debian:12", "debian:13"]
+    runs-on: ubuntu-24.04
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-amd64
+      - name: Run
+        run: |
+          apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libgtk-3-0 libwebkit2gtk-4.1-0 >/dev/null
+          tar -xzf dbro-*-linux-amd64.tar.gz
+          ./dbro-*-linux-amd64/dbro version
+
+  release:
+    needs: [build, smoke]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v4
