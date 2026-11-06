@@ -5,7 +5,7 @@
 ## Features
 
 - **Connections** to servers, SQLite files and Laravel projects (read from `.env` on every connect), with SSL/TLS and SSH tunnels (`~/.ssh/config`, ssh-agent, `ProxyJump`, `known_hosts`). Passwords live in the system keyring, never on disk.
-- **lerd**: every lerd project shows up with its own database, found the way lerd does it, from the project's framework definition (Laravel, Symfony, WordPress, Drupal, Craft and the rest lerd knows, including git worktrees). lerd's MySQL and PostgreSQL services are listed too and connect on startup.
+- **Lerd**: every Lerd project shows up with its own database, found the way Lerd does it, from the project's framework definition (Laravel, Symfony, WordPress, Drupal, Craft and the rest Lerd knows, including git worktrees). Lerd's MySQL and PostgreSQL services are listed too and connect on startup.
 - **Data grid** with paging, sorting, a WHERE filter, inline editing with a change queue, NULL handling, a side editor for JSON and long text, foreign-key following, and copy as CSV, TSV, JSON, SQL, Markdown or a PHP array.
 - **Schema editor**: create, rename, truncate and drop databases and tables; add, change, move and drop columns, indexes and foreign keys, always with a SQL preview first. SQLite tables are rebuilt where `ALTER TABLE` falls short.
 - **Quick access**: a command palette (Ctrl+K) that jumps to any project, connection, database or table and runs actions, run the statement under the cursor (Alt+Enter), filter from any cell, and generated SELECT/INSERT/UPDATE/DELETE statements.
@@ -17,7 +17,7 @@
 
 ## Install
 
-Builds for every release are on [Releases](https://github.com/ExeQue/dbro/releases): Linux (amd64, arm64), macOS (universal: Apple Silicon and Intel) and Windows (amd64, also runs on Windows on Arm). lerd and Omarchy integration only apply on Linux; everything else works everywhere.
+Builds for every release are on [Releases](https://github.com/ExeQue/dbro/releases): Linux (amd64, arm64), macOS (universal: Apple Silicon and Intel) and Windows (amd64, also runs on Windows on Arm). Lerd and Omarchy integration only apply on Linux; everything else works everywhere.
 
 ### Linux
 
@@ -139,7 +139,7 @@ DBRO_TOKEN=secret dbro serve --addr 0.0.0.0:7810
 
 ```sh
 make dev     # wails dev with hot reload
-make test    # go test ./... (set DBRO_TEST_LERD=1 to also test against lerd's MySQL and PostgreSQL)
+make test    # go test ./... (set DBRO_TEST_LERD=1 to also test against Lerd's MySQL and PostgreSQL)
 ```
 
 ## License
