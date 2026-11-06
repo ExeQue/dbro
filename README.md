@@ -14,7 +14,7 @@
 - **Quick access**: a command palette (Ctrl+K) that jumps to any project, connection, database or table and runs actions, run the statement under the cursor (Alt+Enter), filter from any cell, and generated SELECT/INSERT/UPDATE/DELETE statements.
 - **Query tabs** with CodeMirror, named and positional parameters, autocomplete for tables and columns, several result sets, EXPLAIN, a per-connection history and saved snippets.
 - **Import and export**: tables and results to CSV, JSON or SQL; full SQL dumps; SQL and CSV import; **Clone to** another database or connection, across drivers.
-- **Themes**: dbro Dark and Light (picked from your system preference on first start), Tokyo Night, Catppuccin, Gruvbox, Nord, your own in `~/.config/dbro/themes/*.toml`, or live sync with Omarchy.
+- **Themes**: dbro Dark and Light (picked from your system preference on first start), Tokyo Night, Catppuccin, Gruvbox, Nord, your own in `~/.config/dbro/themes/*.toml`, or live sync with Omarchy. See [Themes](docs/themes.md).
 - **MCP server** for agents (stdio or streamable HTTP): read-only by default, writes only on connections you allow, connections can be hidden.
 - **Headless mode**: `dbro serve` puts the app in a web browser on a port, embeddable in other applications.
 
@@ -127,52 +127,7 @@ make install        # builds and installs to ~/.local (binary, .desktop file, ic
 
 ## Themes
 
-The built-in themes:
-
-<table>
-  <tr>
-    <td><img src="assets/screenshots/theme-dbro-dark.png" alt="dbro with the dbro Dark theme"></td>
-    <td><img src="assets/screenshots/theme-dbro-light.png" alt="dbro with the dbro Light theme"></td>
-  </tr>
-  <tr>
-    <td align="center">dbro Dark</td>
-    <td align="center">dbro Light</td>
-  </tr>
-  <tr>
-    <td><img src="assets/screenshots/theme-tokyo-night.png" alt="dbro with the Tokyo Night theme"></td>
-    <td><img src="assets/screenshots/theme-nord.png" alt="dbro with the Nord theme"></td>
-  </tr>
-  <tr>
-    <td align="center">Tokyo Night</td>
-    <td align="center">Nord</td>
-  </tr>
-  <tr>
-    <td><img src="assets/screenshots/theme-catppuccin-mocha.png" alt="dbro with the Catppuccin Mocha theme"></td>
-    <td><img src="assets/screenshots/theme-catppuccin-latte.png" alt="dbro with the Catppuccin Latte theme"></td>
-  </tr>
-  <tr>
-    <td align="center">Catppuccin Mocha</td>
-    <td align="center">Catppuccin Latte</td>
-  </tr>
-  <tr>
-    <td><img src="assets/screenshots/theme-gruvbox-dark.png" alt="dbro with the Gruvbox Dark theme"></td>
-    <td></td>
-  </tr>
-  <tr>
-    <td align="center">Gruvbox Dark</td>
-    <td align="center">or your own, or live Omarchy sync</td>
-  </tr>
-</table>
-
-A theme is an Omarchy `colors.toml`: `mode`, `accent`, `background`, `foreground`, `selection`, the ANSI colors and so on. Missing keys come from dbro Dark or dbro Light. The logo follows `accent`; a theme can recolor it with optional keys:
-
-```toml
-logo_body = "#a3be8c"   # the cylinder
-logo_lid = "#c8dcb4"    # its top
-logo_band = "#6f8a5a"   # the disk band and rim
-logo_glint = "#ebcb8b"  # the sunglasses' glints
-logo_ink = "#20242c"    # sunglasses and smile
-```
+Seven built-in themes, light or dark from your system, live [Omarchy](https://omarchy.org) sync, and your own themes as TOML files. See [docs/themes.md](docs/themes.md) for the gallery and the theme format.
 
 ## MCP for agents
 
