@@ -1,6 +1,6 @@
 # Maintainer: Morten Harders <mmh@harders-it.dk>
 pkgname=dbro-bin
-pkgver=0.1.0
+pkgver=0.1.1
 pkgrel=1
 pkgdesc="Fast, keyboard-friendly database client for MySQL, MariaDB, PostgreSQL and SQLite, with an MCP server for agents"
 arch=(x86_64 aarch64)
