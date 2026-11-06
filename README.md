@@ -4,8 +4,7 @@
 
 ## Features
 
-- **Connections** to servers, SQLite files and Laravel projects (read from `.env` on every connect), with SSL/TLS and SSH tunnels (`~/.ssh/config`, ssh-agent, `ProxyJump`, `known_hosts`). Passwords live in the system keyring, never on disk.
-- **[Lerd](https://lerd.sh)**: every Lerd project shows up with its own database, found the way Lerd does it, from the project's framework definition (Laravel, Symfony, WordPress, Drupal, Craft and the rest Lerd knows, including git worktrees). Lerd's MySQL and PostgreSQL services are listed too and connect on startup.
+- **Connections** to servers and SQLite files, with SSL/TLS and SSH tunnels. Passwords live in the system keyring, never on disk.
 - **Data grid** with paging, sorting, a WHERE filter, inline editing with a change queue, NULL handling, a side editor for JSON and long text, foreign-key following, and copy as CSV, TSV, JSON, SQL, Markdown or a PHP array.
 - **Schema editor**: create, rename, truncate and drop databases and tables; add, change, move and drop columns, indexes and foreign keys, always with a SQL preview first. SQLite tables are rebuilt where `ALTER TABLE` falls short.
 - **Quick access**: a command palette (Ctrl+K) that jumps to any project, connection, database or table and runs actions, run the statement under the cursor (Alt+Enter), filter from any cell, and generated SELECT/INSERT/UPDATE/DELETE statements.
@@ -15,9 +14,21 @@
 - **MCP server** for agents (stdio or streamable HTTP): read-only by default, writes only on connections you allow, connections can be hidden.
 - **Headless mode**: `dbro serve` puts the app in a web browser on a port, embeddable in other applications.
 
+## Integrations
+
+Lerd, Omarchy and the desktop portal are Linux only; the rest works on Linux, macOS and Windows.
+
+- **[Lerd](https://lerd.sh)**: every Lerd project shows up with its own database, found the way Lerd does it, from the project's framework definition (Laravel, Symfony, WordPress, Drupal, Craft and the rest Lerd knows, including git worktrees). Lerd's MySQL and PostgreSQL services are listed too and connect on startup.
+- **[Laravel](https://laravel.com)**: point a connection at a project folder and dbro reads the database settings from its `.env` on every connect.
+- **[Omarchy](https://omarchy.org)**: the theme follows Omarchy's current theme live, including theme switches.
+- **[MCP](https://modelcontextprotocol.io)**: agents such as [Claude Code](https://claude.com/claude-code) get your saved connections over stdio or streamable HTTP, read-only by default. See [MCP for agents](#mcp-for-agents).
+- **OpenSSH**: tunnels read `~/.ssh/config` (host aliases, `ProxyJump`), use ssh-agent and check `known_hosts`.
+- **System keyring**: passwords go to the Secret Service on Linux (GNOME Keyring, KWallet), the Keychain on macOS and the Credential Manager on Windows.
+- **Desktop portal**: file pickers and the light/dark preference come from the XDG desktop portal, so they match your desktop.
+
 ## Install
 
-Builds for every release are on [Releases](https://github.com/ExeQue/dbro/releases): Linux (amd64, arm64), macOS (universal: Apple Silicon and Intel) and Windows (amd64, also runs on Windows on Arm). Lerd and Omarchy integration only apply on Linux; everything else works everywhere.
+Builds for every release are on [Releases](https://github.com/ExeQue/dbro/releases): Linux (amd64, arm64), macOS (universal: Apple Silicon and Intel) and Windows (amd64, also runs on Windows on Arm).
 
 ### Linux
 
