@@ -1,0 +1,21 @@
+pkgbase = dbro-bin
+	pkgdesc = Fast, keyboard-friendly database client for MySQL, MariaDB, PostgreSQL and SQLite, with an MCP server for agents
+	pkgver = 0.1.2
+	pkgrel = 1
+	url = https://github.com/ExeQue/dbro
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	depends = gtk3
+	depends = webkit2gtk-4.1
+	optdepends = org.freedesktop.secrets: keep connection passwords in the system keyring
+	provides = dbro
+	conflicts = dbro
+	options = !debug
+	options = !strip
+	source_x86_64 = https://github.com/ExeQue/dbro/releases/download/v0.1.2/dbro-v0.1.2-linux-amd64.tar.gz
+	sha256sums_x86_64 = cb43d8ae228737575c97cc8c213ebb5b25422f36d939f1ef05dc2985fd831aa1
+	source_aarch64 = https://github.com/ExeQue/dbro/releases/download/v0.1.2/dbro-v0.1.2-linux-arm64.tar.gz
+	sha256sums_aarch64 = 24e38f4214eb16bcb7962dc4d1a6b3b3dd8d08d971c4e5b68903cc6b6dadab61
+
+pkgname = dbro-bin
