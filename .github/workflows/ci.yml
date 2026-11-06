@@ -40,6 +40,8 @@ jobs:
       - name: Frontend
         working-directory: frontend
         run: npm ci && npm run build
+      - name: Build
+        run: go build -tags webkit2_41 ./...
       - name: Vet
         run: go vet -tags webkit2_41 ./...
       - name: Test
@@ -47,11 +49,11 @@ jobs:
           DBRO_TEST_LERD: "1"
         run: go test -tags webkit2_41 -race ./...
 
-  # macOS and Windows have no database services here; this only proves the app builds
+  # no database services on these runners; this only proves the app builds (Linux amd64 builds in test)
   build:
     strategy:
       matrix:
-        runner: [macos-15, windows-2025]
+        runner: [ubuntu-24.04-arm, macos-15, windows-2025]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
@@ -63,8 +65,11 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+      - name: System libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
       - name: Frontend
         working-directory: frontend
         run: npm ci && npm run build
       - name: Build
-        run: go build ./...
+        run: go build -tags webkit2_41 ./...
