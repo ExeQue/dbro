@@ -141,7 +141,7 @@ dbro mcp --http                                                   # streamable H
 claude mcp add --transport http dbro http://127.0.0.1:7811/mcp
 ```
 
-Tools: `list_connections`, `list_databases`, `list_tables`, `describe_table`, `query` (always in a read-only transaction) and `execute` (only where *Allow agents to change data* is on). Agent statements appear in the app's SQL log marked `[mcp]`.
+Tools: `list_connections`, `list_databases`, `list_tables`, `describe_table`, `query` (always in a read-only transaction) and `execute` (only where *Allow agents to change data* is on: in Edit for saved connections, in the right-click menu for Lerd projects and services). Agent statements appear in the app's SQL log marked `[mcp]`.
 
 ## Headless mode
 
