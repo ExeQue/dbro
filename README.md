@@ -1,5 +1,7 @@
 <p align="center"><img src="assets/banner.svg" alt="dbro: your database bro" width="100%"></p>
 
+<p align="center"><a href="https://github.com/ExeQue/dbro/actions/workflows/ci.yml"><img src="https://github.com/ExeQue/dbro/actions/workflows/ci.yml/badge.svg" alt="CI"></a> <a href="https://github.com/ExeQue/dbro/releases/latest"><img src="https://img.shields.io/github/v/release/ExeQue/dbro" alt="Latest release"></a> <a href="LICENSE"><img src="https://img.shields.io/github/license/ExeQue/dbro" alt="MIT license"></a></p>
+
 **dbro** is a fast, keyboard-friendly database client for developers, built for Linux and available for macOS and Windows too. It talks to **MySQL, MariaDB, PostgreSQL and SQLite**, finds your local project databases by itself, follows your **[Omarchy](https://omarchy.org)** theme, and ships an **MCP server** so your agents can work with the same databases you do.
 
 ## Features
