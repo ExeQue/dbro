@@ -762,22 +762,6 @@ func (c *Conn) TableInfo(ctx context.Context, database, schema, table string) ([
 			out = append(out, InfoItem{label, s})
 		}
 	}
-	bytes := func(v any) string {
-		n := i64(v)
-		if n == nil {
-			return ""
-		}
-		units := []string{"B", "KiB", "MiB", "GiB", "TiB"}
-		f, i := float64(*n), 0
-		for f >= 1024 && i < len(units)-1 {
-			f /= 1024
-			i++
-		}
-		if i == 0 {
-			return fmt.Sprintf("%d B", *n)
-		}
-		return fmt.Sprintf("%.1f %s", f, units[i])
-	}
 	switch c.Kind() {
 	case "mysql":
 		// MySQL 8 caches these statistics for a day unless told otherwise; MariaDB has no such variable.
@@ -860,6 +844,117 @@ func (c *Conn) TableInfo(ctx context.Context, database, schema, table string) ([
 		}
 		if sz, err := c.run(ctx, conn, database, "SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()", 0); err == nil && len(sz.Rows) > 0 {
 			add("Database file size", bytes(sz.Rows[0][0]))
+		}
+	}
+	return out, nil
+}
+
+// bytes formats a byte count like 1.5 MiB; "" when v is not a number.
+func bytes(v any) string {
+	n := i64(v)
+	if n == nil {
+		return ""
+	}
+	units := []string{"B", "KiB", "MiB", "GiB", "TiB"}
+	f, i := float64(*n), 0
+	for f >= 1024 && i < len(units)-1 {
+		f /= 1024
+		i++
+	}
+	if i == 0 {
+		return fmt.Sprintf("%d B", *n)
+	}
+	return fmt.Sprintf("%.1f %s", f, units[i])
+}
+
+// DatabaseInfo returns facts about a database: character set and collation, sizes, object counts.
+func (c *Conn) DatabaseInfo(ctx context.Context, database string) ([]InfoItem, error) {
+	p, err := c.pool(database)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := p.Conn(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	var out []InfoItem
+	add := func(label string, v any) {
+		if s := str(v); s != "" {
+			out = append(out, InfoItem{label, s})
+		}
+	}
+	// row runs a one-row query and returns its values, or nil
+	row := func(q string, args ...any) []any {
+		r, err := c.run(ctx, conn, database, q, 0, args...)
+		if err != nil || len(r.Rows) == 0 {
+			return nil
+		}
+		return r.Rows[0]
+	}
+	switch c.Kind() {
+	case "mysql":
+		conn.ExecContext(ctx, "SET SESSION information_schema_stats_expiry = 0")
+		v := row("SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?", database)
+		if v == nil {
+			return nil, fmt.Errorf("database %s not found", database)
+		}
+		add("Character set", v[0])
+		add("Collation", v[1])
+		if t := row(`SELECT SUM(TABLE_TYPE = 'BASE TABLE'), SUM(TABLE_TYPE = 'VIEW'), SUM(DATA_LENGTH), SUM(INDEX_LENGTH), SUM(DATA_LENGTH + INDEX_LENGTH)
+			FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?`, database); t != nil {
+			add("Tables", t[0])
+			add("Views", t[1])
+			add("Data size", bytes(t[2]))
+			add("Index size", bytes(t[3]))
+			add("Total size", bytes(t[4]))
+		}
+		if r := row("SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = ?", database); r != nil {
+			add("Routines", r[0])
+		}
+		if r := row("SELECT COUNT(*) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = ?", database); r != nil {
+			add("Triggers", r[0])
+		}
+	case "postgres":
+		v := row(`SELECT pg_get_userbyid(d.datdba), pg_encoding_to_char(d.encoding), d.datcollate, d.datctype, t.spcname,
+				CASE WHEN d.datconnlimit < 0 THEN 'unlimited' ELSE d.datconnlimit::text END, pg_database_size(d.oid),
+				shobj_description(d.oid, 'pg_database')
+			FROM pg_database d JOIN pg_tablespace t ON t.oid = d.dattablespace WHERE d.datname = $1`, database)
+		if v == nil {
+			return nil, fmt.Errorf("database %s not found", database)
+		}
+		add("Owner", v[0])
+		add("Encoding", v[1])
+		add("Collation", v[2])
+		add("Character type", v[3])
+		add("Tablespace", v[4])
+		add("Connection limit", v[5])
+		add("Size", bytes(v[6]))
+		if t := row(`SELECT COUNT(DISTINCT n.nspname), COUNT(*) FILTER (WHERE c.relkind IN ('r', 'p')), COUNT(*) FILTER (WHERE c.relkind IN ('v', 'm'))
+			FROM pg_namespace n LEFT JOIN pg_class c ON c.relnamespace = n.oid
+			WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_toast%' AND n.nspname NOT LIKE 'pg_temp%'`); t != nil {
+			add("Schemas", t[0])
+			add("Tables", t[1])
+			add("Views", t[2])
+		}
+		add("Comment", v[7])
+	case "sqlite":
+		for _, p := range []struct{ label, pragma string }{
+			{"Encoding", "encoding"}, {"Journal mode", "journal_mode"}, {"Page size", "page_size"}, {"Pages", "page_count"},
+			{"Free pages", "freelist_count"}, {"Auto vacuum", "auto_vacuum"}, {"Foreign keys", "foreign_keys"}, {"User version", "user_version"},
+		} {
+			if v := row("PRAGMA " + p.pragma); v != nil {
+				add(p.label, v[0])
+			}
+		}
+		if v := row("SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()"); v != nil {
+			add("Size", bytes(v[0]))
+		}
+		if v := row("SELECT SUM(type = 'table' AND name NOT LIKE 'sqlite_%'), SUM(type = 'view'), SUM(type = 'index'), SUM(type = 'trigger') FROM sqlite_master"); v != nil {
+			add("Tables", v[0])
+			add("Views", v[1])
+			add("Indexes", v[2])
+			add("Triggers", v[3])
 		}
 	}
 	return out, nil

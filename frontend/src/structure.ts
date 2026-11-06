@@ -34,13 +34,32 @@ export class StructureTab {
     return this.ops().length > 0;
   }
 
+  /** showDatabase lists facts about a database: character set, collation, sizes and object counts. */
+  private async showDatabase(sel: Selection) {
+    clear(this.el, h('div', { class: 'empty' }, 'Loading…'));
+    let info: db.InfoItem[];
+    try {
+      info = await forConn(sel.conn, () => Go.DatabaseInfo(sel.conn, sel.db!));
+    } catch (e) {
+      return clear(this.el, h('div', { class: 'result-error' }, errorMessage(e)));
+    }
+    if (this.sel !== sel) return;
+    clear(this.el,
+      h('div', { class: 'pane-toolbar' }, h('b', {}, sel.db!), h('span', { class: 'spacer' }),
+        h('button', { type: 'button', class: 'btn', onclick: () => this.newTable(sel) }, icon('plus'), 'New table')),
+      h('div', { class: 'structure' },
+        h('div', { class: 'table-info' }, h('h3', {}, 'Database info'),
+          h('dl', {}, info.map((it) => h('div', {}, h('dt', {}, it.label), h('dd', {}, it.value)))))));
+  }
+
   async show(sel: Selection | null, force = false) {
     if (!force && this.sel && sel && same(this.sel, sel) && !this.isNew) return;
     this.sel = sel;
     this.isNew = false;
     if (!sel) return clear(this.el, h('div', { class: 'empty' }, 'Select a table to see its structure.'));
     if (sel.kind === 'routine') return this.showRoutine(sel);
-    if (sel.kind !== 'table' && sel.kind !== 'view') return clear(this.el, h('div', { class: 'empty' }, 'Select a table to see its structure.', sel.kind === 'database' ? h('button', { type: 'button', class: 'btn', onclick: () => this.newTable(sel) }, icon('plus'), 'New table') : null));
+    if (sel.kind === 'database') return this.showDatabase(sel);
+    if (sel.kind !== 'table' && sel.kind !== 'view') return clear(this.el, h('div', { class: 'empty' }, 'Select a table to see its structure.'));
     clear(this.el, h('div', { class: 'empty' }, 'Loading…'));
     try {
       this.def = await forConn(sel.conn, () => Go.Describe(sel.conn, sel.db!, sel.schema ?? '', sel.table!));
