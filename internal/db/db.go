@@ -167,7 +167,7 @@ func (c *Conn) openMySQL(database string) (*sql.DB, error) {
 	mc.Timeout = 10 * time.Second
 	switch c.Cfg.SSLMode {
 	case "", "disable":
-	case "require":
+	case "require": // like libpq: encrypt, but verify nothing; verify-ca and verify-full check the certificate
 		mc.TLS = &tls.Config{InsecureSkipVerify: true}
 	default:
 		tc, err := c.tlsConfig()

@@ -121,7 +121,7 @@ export function rowsAs(format: 'csv' | 'tsv' | 'json' | 'sql' | 'markdown' | 'ph
       return rows.length === 1 ? one(rows[0]) + ';' : '[\n' + rows.map((r) => one(r).replace(/^/gm, '    ')).join(',\n') + ',\n];';
     }
     case 'markdown': {
-      const esc = (v: unknown) => cellText(v).replace(/\|/g, '\\|').replace(/\n/g, ' ');
+      const esc = (v: unknown) => cellText(v).replace(/[\\|]/g, '\\$&').replace(/\n/g, ' ');
       return [`| ${columns.map(esc).join(' | ')} |`, `| ${columns.map(() => '---').join(' | ')} |`, ...rows.map((r) => `| ${r.map(esc).join(' | ')} |`)].join('\n');
     }
   }
