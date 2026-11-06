@@ -30,6 +30,10 @@ export function CloseQueryTab(arg1, arg2, arg3) {
   return window['go']['main']['App']['CloseQueryTab'](arg1, arg2, arg3);
 }
 
+export function Collations(arg1) {
+  return window['go']['main']['App']['Collations'](arg1);
+}
+
 export function Completions(arg1, arg2) {
   return window['go']['main']['App']['Completions'](arg1, arg2);
 }
@@ -40,6 +44,10 @@ export function Connect(arg1) {
 
 export function CopyText(arg1) {
   return window['go']['main']['App']['CopyText'](arg1);
+}
+
+export function DatabaseInfo(arg1, arg2) {
+  return window['go']['main']['App']['DatabaseInfo'](arg1, arg2);
 }
 
 export function DatabaseLabels(arg1) {
@@ -184,10 +192,6 @@ export function SetTheme(arg1) {
 
 export function Snippets() {
   return window['go']['main']['App']['Snippets']();
-}
-
-export function DatabaseInfo(arg1, arg2) {
-  return window['go']['main']['App']['DatabaseInfo'](arg1, arg2);
 }
 
 export function TableInfo(arg1, arg2, arg3, arg4) {

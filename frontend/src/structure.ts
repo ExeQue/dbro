@@ -14,10 +14,33 @@ interface ColRow {
 }
 
 const commonTypes: Record<string, string[]> = {
-  mysql: ['bigint unsigned', 'int', 'tinyint(1)', 'varchar(255)', 'text', 'longtext', 'decimal(10,2)', 'double', 'date', 'datetime', 'timestamp', 'json', 'blob'],
-  postgres: ['bigint', 'integer', 'boolean', 'varchar(255)', 'text', 'numeric(10,2)', 'double precision', 'date', 'timestamp', 'timestamptz', 'jsonb', 'uuid', 'bytea'],
+  mysql: ['bigint unsigned', 'int', 'tinyint', 'char', 'varchar', 'text', 'longtext', 'decimal', 'double', 'date', 'datetime', 'timestamp', 'json', 'blob', 'enum'],
+  postgres: ['bigint', 'integer', 'boolean', 'char', 'varchar', 'text', 'numeric', 'double precision', 'date', 'timestamp', 'timestamptz', 'jsonb', 'uuid', 'bytea'],
   sqlite: ['INTEGER', 'TEXT', 'REAL', 'NUMERIC', 'BLOB'],
 };
+
+// sizes filled in when a type that needs one is picked with the size empty
+const defaultSize: Record<string, string> = { varchar: '255', char: '36', decimal: '10,2', numeric: '10,2', enum: "'a','b'" };
+
+// suffixes the size goes in front of: decimal(10,2) unsigned, timestamp(6) with time zone, varchar(255)[]
+const sizeBefore = /\s+(unsigned|zerofill|with|without)\b|\[/i;
+
+/** splitType turns "decimal(10,2) unsigned" into ["decimal unsigned", "10,2"]. */
+export function splitType(type: string): [string, string] {
+  const m = /^([^(]*)\((.*)\)(.*)$/.exec(type);
+  if (!m) return [type, ''];
+  const rest = m[3].trim();
+  return [(m[1].trim() + (rest && !rest.startsWith('[') ? ' ' : '') + rest).trim(), m[2]];
+}
+
+/** joinType is the inverse of splitType. */
+export function joinType(base: string, size: string): string {
+  base = base.trim();
+  size = size.trim();
+  if (!size) return base;
+  const at = base.search(sizeBefore);
+  return at < 0 ? `${base}(${size})` : `${base.slice(0, at)}(${size})${base.slice(at)}`;
+}
 
 export class StructureTab {
   el = h('div', { class: 'pane' });
@@ -46,10 +69,38 @@ export class StructureTab {
     if (this.sel !== sel) return;
     clear(this.el,
       h('div', { class: 'pane-toolbar' }, h('b', {}, sel.db!), h('span', { class: 'spacer' }),
+        dialect(sel.conn) === 'mysql' ? h('button', { type: 'button', class: 'btn', onclick: () => this.editCollation(sel, info) }, 'Character set and collation…') : null,
         h('button', { type: 'button', class: 'btn', onclick: () => this.newTable(sel) }, icon('plus'), 'New table')),
       h('div', { class: 'structure' },
         h('div', { class: 'table-info' }, h('h3', {}, 'Database info'),
           h('dl', {}, info.map((it) => h('div', {}, h('dt', {}, it.label), h('dd', {}, it.value)))))));
+  }
+
+  /** editCollation changes a MySQL database's default character set and collation, and optionally converts its tables. */
+  private async editCollation(sel: Selection, info: db.InfoItem[]) {
+    let all: db.Collation[], tables: string[];
+    try {
+      all = await forConn(sel.conn, () => Go.Collations(sel.conn));
+      tables = ((await forConn(sel.conn, () => Go.DatabaseObjects(sel.conn, sel.db!))).tables ?? []).filter((t) => t.type !== 'view').map((t) => t.name);
+    } catch (e) {
+      return toast(errorMessage(e), 'error');
+    }
+    const current = (label: string) => info.find((it) => it.label === label)?.value ?? '';
+    const charset = h('select', { class: 'input' }, [...new Set(all.map((c) => c.charset))].map((cs) => h('option', { value: cs, selected: cs === current('Character set') }, cs)));
+    const collation = h('select', { class: 'input' });
+    const fill = (keep: string) => clear(collation, all.filter((c) => c.charset === charset.value).map((c) => h('option', { value: c.name, selected: keep ? c.name === keep : c.isDefault }, c.name + (c.isDefault ? ' (default)' : ''))));
+    fill(current('Collation'));
+    charset.addEventListener('change', () => fill(''));
+    const convert = h('input', { type: 'checkbox' });
+    const r = await modal(`Character set of ${sel.db}`, h('div', { class: 'form' },
+      h('div', { class: 'form-row' }, field('Character set', charset), field('Collation', collation)),
+      h('p', { class: 'muted' }, 'This sets the default for new tables. Existing tables keep theirs unless converted.'),
+      tables.length ? h('label', { class: 'check' }, convert, ` Also convert the ${tables.length} existing tables (rewrites every table, slow on big ones)`) : null,
+    ), [{ label: 'Cancel' }, { label: 'Preview SQL', primary: true }], { wide: true });
+    if (r !== 1) return;
+    const ops = [{ kind: 'alter_database', name: sel.db!, charset: charset.value, collation: collation.value } as db.SchemaOp,
+      ...(convert.checked ? tables.map((t) => ({ kind: 'convert_table', table: t, charset: charset.value, collation: collation.value }) as db.SchemaOp) : [])];
+    if (await runSchema(sel, ops)) this.show(sel, true);
   }
 
   async show(sel: Selection | null, force = false) {
@@ -98,7 +149,7 @@ export class StructureTab {
     const types = h('datalist', { id: 'coltypes' }, commonTypes[d].map((t) => h('option', { value: t })));
     const pk = new Set(def.indexes?.find((i) => i.primary)?.columns ?? []);
     const colTable = h('table', { class: 'sgrid' },
-      h('tr', {}, ['#', 'Name', 'Type', 'Null', 'Default', 'Auto', 'Comment', ''].map((t) => h('th', {}, t))),
+      h('tr', {}, ['#', 'Name', 'Type', 'Length/Set', 'Null', 'Default', 'Auto', 'Comment', ''].map((t) => h('th', {}, t))),
       this.rows.map((r, i) => {
         const changed = r.orig && JSON.stringify(strip(r.orig)) !== JSON.stringify(strip(r.col));
         const moved = r.orig && this.position(r) !== null;
@@ -107,6 +158,23 @@ export class StructureTab {
           const el = h('input', { class: 'input', value: r.col[key] ?? '', readOnly: ro || r.dropped, 'aria-label': key + ' of ' + r.col.name, spellcheck: 'false', ...attrs });
           el.addEventListener('input', () => { (r.col as any)[key] = el.value; this.mark(tr, r); });
           return el;
+        };
+        // the type is edited as a base type and a separate length/set, joined back into r.col.type
+        const typeCells = () => {
+          const [b, sz] = splitType(r.col.type ?? '');
+          const base = h('input', { class: 'input type', list: 'coltypes', value: b, readOnly: ro || r.dropped, 'aria-label': 'type of ' + r.col.name, spellcheck: 'false' });
+          const size = h('input', { class: 'input size', value: sz, readOnly: ro || r.dropped, 'aria-label': 'length or set of ' + r.col.name, spellcheck: 'false', title: "Length, precision (10,2) or enum/set values ('a','b')" });
+          const sync = () => {
+            r.col.type = joinType(base.value, size.value);
+            this.mark(tr, r);
+          };
+          base.addEventListener('input', () => {
+            const d = defaultSize[base.value.trim().toLowerCase()];
+            if (d && !size.value) size.value = d;
+            sync();
+          });
+          size.addEventListener('input', sync);
+          return [h('td', {}, base), h('td', { class: 'size-cell' }, size)];
         };
         const def = h('input', { class: 'input', value: r.col.default ?? '', placeholder: r.col.default === null || r.col.default === undefined ? 'none' : '', readOnly: ro || r.dropped, 'aria-label': 'default of ' + r.col.name, spellcheck: 'false', title: "SQL expression: 'text', 0, CURRENT_TIMESTAMP, NULL" });
         def.addEventListener('input', () => { r.col.default = def.value === '' ? undefined : def.value; this.mark(tr, r); });
@@ -118,7 +186,7 @@ export class StructureTab {
         append(tr,
           h('td', { class: 'muted' }, String(i + 1), pk.has(r.orig?.name ?? '') ? h('span', { class: 'key', title: 'primary key' }, ' ', icon('key', 11)) : null),
           h('td', {}, inp('name')),
-          h('td', {}, inp('type', { list: 'coltypes', class: 'input type' })),
+          typeCells(),
           h('td', {}, chk('nullable')),
           h('td', {}, def),
           h('td', {}, chk('autoIncrement')),
@@ -258,12 +326,20 @@ export class StructureTab {
     const cols = this.def!.columns.map((c) => c.name);
     const checks = cols.map((c) => h('input', { type: 'checkbox', 'data-col': c }));
     const kind = h('select', { class: 'input' }, h('option', { value: 'index' }, 'INDEX'), h('option', { value: 'unique' }, 'UNIQUE'), h('option', { value: 'primary' }, 'PRIMARY KEY'));
-    const name = h('input', { class: 'input', placeholder: 'generated if empty' });
+    const name = h('input', { class: 'input' });
     const order: string[] = [];
+    // the placeholder shows the name the server side would generate (see planOne in schema.go)
+    const hint = () => {
+      name.disabled = kind.value === 'primary';
+      name.placeholder = name.disabled ? 'PRIMARY' : `${this.def!.name}_${order.length ? order.join('_') : '…'}_${kind.value === 'unique' ? 'unique' : 'index'}`;
+    };
+    hint();
+    kind.addEventListener('change', hint);
     checks.forEach((c) => c.addEventListener('change', () => {
       const col = c.dataset.col!;
       if (c.checked) order.push(col);
       else order.splice(order.indexOf(col), 1);
+      hint();
     }));
     const r = await modal('New index', h('div', { class: 'form' }, h('div', { class: 'form-row' }, field('Type', kind), field('Name', name)),
       h('div', {}, h('span', { class: 'muted' }, 'Columns, in the order you tick them:'), h('div', { style: { display: 'grid', gap: '4px', marginTop: '6px' } }, checks.map((c, i) => h('label', { class: 'check' }, c, cols[i]))))),
@@ -296,7 +372,10 @@ export class StructureTab {
     const actions = ['NO ACTION', 'CASCADE', 'SET NULL', 'RESTRICT'];
     const onDelete = h('select', { class: 'input' }, actions.map((a) => h('option', {}, a)));
     const onUpdate = h('select', { class: 'input' }, actions.map((a) => h('option', {}, a)));
-    const name = h('input', { class: 'input', placeholder: 'generated if empty' });
+    const name = h('input', { class: 'input' });
+    const hint = () => (name.placeholder = `${this.def!.name}_${col.value}_foreign`);
+    hint();
+    col.addEventListener('change', hint);
     const r = await modal('New foreign key', h('div', { class: 'form' },
       h('div', { class: 'form-row' }, field('Column', col), field('References table', ref), field('Column', refCol)),
       h('div', { class: 'form-row' }, field('On delete', onDelete), field('On update', onUpdate), field('Name', name))),

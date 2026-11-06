@@ -128,6 +128,22 @@ export namespace db {
 	        this.withData = source["withData"];
 	    }
 	}
+	export class Collation {
+	    charset: string;
+	    name: string;
+	    isDefault: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new Collation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.charset = source["charset"];
+	        this.name = source["name"];
+	        this.isDefault = source["isDefault"];
+	    }
+	}
 	export class Column {
 	    name: string;
 	    type: string;
@@ -324,6 +340,8 @@ export namespace db {
 	    def?: TableDef;
 	    index?: Index;
 	    fk?: ForeignKey;
+	    charset?: string;
+	    collation?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new SchemaOp(source);
@@ -340,6 +358,8 @@ export namespace db {
 	        this.def = this.convertValues(source["def"], TableDef);
 	        this.index = this.convertValues(source["index"], Index);
 	        this.fk = this.convertValues(source["fk"], ForeignKey);
+	        this.charset = source["charset"];
+	        this.collation = source["collation"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

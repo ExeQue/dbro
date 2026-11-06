@@ -187,6 +187,8 @@ table.grid td.fk { text-decoration: underline dotted var(--dark-foreground); }
 .sgrid tr.dirty td { background: color-mix(in srgb, var(--yellow) 12%, transparent); }
 .sgrid tr.dropped td { opacity: 0.5; text-decoration: line-through; }
 .sgrid .type { color: var(--cyan); }
+.sgrid .size-cell { width: 110px; }
+.sgrid .size { color: var(--cyan); }
 .sgrid .key { color: var(--yellow); }
 .table-info { margin: 4px 0 6px; }
 .table-info summary { cursor: pointer; color: var(--light-foreground); font-weight: 600; padding: 4px 0; }
@@ -218,6 +220,8 @@ table.grid td.fk { text-decoration: underline dotted var(--dark-foreground); }
 .error-text { white-space: pre-wrap; color: var(--red); margin: 0; }
 .form { display: grid; gap: 10px; }
 .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.form-row > * { min-width: 0; }
+.form-row select.input { width: 100%; }
 .field { display: grid; gap: 4px; }
 .field > span { color: var(--light-foreground); font-size: 12px; }
 .field .hint { color: var(--dark-foreground); font-size: 11px; }

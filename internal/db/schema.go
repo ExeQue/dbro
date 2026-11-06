@@ -10,7 +10,7 @@ import (
 
 // SchemaOp is one structural change from the schema editor.
 type SchemaOp struct {
-	Kind   string `json:"kind"` // create_database drop_database create_table rename_table truncate_table drop_table add_column modify_column drop_column add_index drop_index add_fk drop_fk
+	Kind   string `json:"kind"` // create_database alter_database drop_database convert_table create_table rename_table truncate_table drop_table add_column modify_column drop_column add_index drop_index add_fk drop_fk
 	Schema string `json:"schema"`
 	Table  string `json:"table"`
 	// Name is the database for *_database, the new name for rename_table,
@@ -21,7 +21,12 @@ type SchemaOp struct {
 	Def    *TableDef   `json:"def,omitempty"`   // create_table
 	Index  *Index      `json:"index,omitempty"`
 	FK     *ForeignKey `json:"fk,omitempty"`
+	// Charset and Collation are for alter_database and convert_table (MySQL).
+	Charset   string `json:"charset,omitempty"`
+	Collation string `json:"collation,omitempty"`
 }
+
+var ident = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
 
 var numeric = regexp.MustCompile(`^-?\d+(\.\d+)?$`)
 
@@ -192,6 +197,17 @@ func (c *Conn) planOne(op SchemaOp, get func(schema, table string) (*TableDef, e
 			return []string{"CREATE DATABASE " + c.Q(op.Name) + " CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"}, nil
 		}
 		return []string{"CREATE DATABASE " + c.Q(op.Name) + ";"}, nil
+	case "alter_database", "convert_table":
+		if k != "mysql" {
+			return nil, errors.New("changing the character set and collation is only supported on MySQL and MariaDB")
+		}
+		if !ident.MatchString(op.Charset) || !ident.MatchString(op.Collation) {
+			return nil, fmt.Errorf("invalid character set %q or collation %q", op.Charset, op.Collation)
+		}
+		if op.Kind == "alter_database" {
+			return []string{fmt.Sprintf("ALTER DATABASE %s CHARACTER SET %s COLLATE %s;", c.Q(op.Name), op.Charset, op.Collation)}, nil
+		}
+		return []string{fmt.Sprintf("ALTER TABLE %s CONVERT TO CHARACTER SET %s COLLATE %s;", t, op.Charset, op.Collation)}, nil
 	case "drop_database":
 		if k == "sqlite" {
 			return nil, errors.New("delete the SQLite file instead")

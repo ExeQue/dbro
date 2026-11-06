@@ -960,6 +960,40 @@ func (c *Conn) DatabaseInfo(ctx context.Context, database string) ([]InfoItem, e
 	return out, nil
 }
 
+// Collation is one MySQL collation and the character set it belongs to.
+type Collation struct {
+	Charset   string `json:"charset"`
+	Name      string `json:"name"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+// Collations lists the server's collations (MySQL and MariaDB only).
+func (c *Conn) Collations(ctx context.Context) ([]Collation, error) {
+	if c.Kind() != "mysql" {
+		return nil, nil
+	}
+	p, err := c.pool(c.defaultDB())
+	if err != nil {
+		return nil, err
+	}
+	rows, err := p.QueryContext(ctx, "SELECT CHARACTER_SET_NAME, COLLATION_NAME, IS_DEFAULT FROM information_schema.COLLATIONS WHERE CHARACTER_SET_NAME IS NOT NULL ORDER BY 1, 2")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Collation
+	for rows.Next() {
+		var co Collation
+		var def string
+		if err := rows.Scan(&co.Charset, &co.Name, &def); err != nil {
+			return nil, err
+		}
+		co.IsDefault = def == "Yes"
+		out = append(out, co)
+	}
+	return out, rows.Err()
+}
+
 // later returns the later of two timestamps formatted the same way (either may be empty).
 func later(a, b string) string {
 	if a > b {

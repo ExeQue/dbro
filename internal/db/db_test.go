@@ -150,6 +150,43 @@ func exercise(t *testing.T, c *Conn, database, schema string) {
 	if dbFacts["Tables"] != "2" || dbFacts["Collation"]+dbFacts["Encoding"] == "" {
 		t.Fatalf("database info: %v", dbFacts)
 	}
+	if c.Kind() == "mysql" {
+		cols, err := c.Collations(ctx)
+		must(err)
+		found := false
+		for _, co := range cols {
+			found = found || co.Name == "utf8mb4_bin" && co.Charset == "utf8mb4"
+		}
+		if !found {
+			t.Fatalf("utf8mb4_bin missing from %d collations", len(cols))
+		}
+		stmts, err := c.PlanSchema(ctx, database, []SchemaOp{
+			{Kind: "alter_database", Name: database, Charset: "utf8mb4", Collation: "utf8mb4_bin"},
+			{Kind: "convert_table", Table: "users", Charset: "utf8mb4", Collation: "utf8mb4_bin"},
+		})
+		must(err)
+		must(c.ApplySchema(ctx, database, stmts))
+		after, err := c.DatabaseInfo(ctx, database)
+		must(err)
+		got := map[string]string{}
+		for _, it := range after {
+			got[it.Label] = it.Value
+		}
+		tinfo, err := c.TableInfo(ctx, database, schema, "users")
+		must(err)
+		tc := ""
+		for _, it := range tinfo {
+			if it.Label == "Collation" {
+				tc = it.Value
+			}
+		}
+		if got["Collation"] != "utf8mb4_bin" || tc != "utf8mb4_bin" {
+			t.Fatalf("after alter: database %q, table %q", got["Collation"], tc)
+		}
+		if _, err := c.PlanSchema(ctx, database, []SchemaOp{{Kind: "alter_database", Name: database, Charset: "utf8mb4", Collation: "x; DROP"}}); err == nil {
+			t.Fatal("collation not validated")
+		}
+	}
 
 	results, err := c.Query(ctx, database, "tab1", "SELECT COUNT(*) AS n FROM "+c.Table(schema, "users")+"; SELECT 1", 100)
 	must(err)

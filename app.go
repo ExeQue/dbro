@@ -830,6 +830,15 @@ func (a *App) DatabaseInfo(name, database string) ([]db.InfoItem, error) {
 	return c.DatabaseInfo(a.ctx, database)
 }
 
+// Collations lists the server's character sets and collations (MySQL and MariaDB).
+func (a *App) Collations(name string) ([]db.Collation, error) {
+	c, err := a.conn(name)
+	if err != nil {
+		return nil, err
+	}
+	return c.Collations(a.ctx)
+}
+
 // TableInfo returns facts about a table (engine, sizes, auto-increment, ...).
 func (a *App) TableInfo(name, database, schema, table string) ([]db.InfoItem, error) {
 	c, err := a.conn(name)

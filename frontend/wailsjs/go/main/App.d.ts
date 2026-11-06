@@ -20,11 +20,15 @@ export function Clone(arg1:string,arg2:string,arg3:Array<db.TableInfo>,arg4:stri
 
 export function CloseQueryTab(arg1:string,arg2:string,arg3:string):Promise<void>;
 
+export function Collations(arg1:string):Promise<Array<db.Collation>>;
+
 export function Completions(arg1:string,arg2:string):Promise<Record<string, Array<string>>>;
 
 export function Connect(arg1:string):Promise<void>;
 
 export function CopyText(arg1:string):Promise<void>;
+
+export function DatabaseInfo(arg1:string,arg2:string):Promise<Array<db.InfoItem>>;
 
 export function DatabaseLabels(arg1:string):Promise<Record<string, string>>;
 
@@ -97,8 +101,6 @@ export function SaveThemeAs(arg1:string,arg2:Record<string, string>):Promise<str
 export function SetTheme(arg1:string):Promise<theme.Theme>;
 
 export function Snippets():Promise<Array<history.Snippet>>;
-
-export function DatabaseInfo(arg1:string,arg2:string):Promise<Array<db.InfoItem>>;
 
 export function TableInfo(arg1:string,arg2:string,arg3:string,arg4:string):Promise<Array<db.InfoItem>>;
 
