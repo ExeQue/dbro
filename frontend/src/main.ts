@@ -51,7 +51,7 @@ function layout() {
     h('button', { type: 'button', class: 'btn', title: 'Refresh (F5)', 'aria-label': 'Refresh', onclick: () => refresh() }, icon('refresh'), h('span', { class: 'lbl' }, 'Refresh'), h('span', { class: 'shortcut' }, 'F5')),
     h('button', { type: 'button', class: 'btn', title: 'New query (Ctrl+T)', 'aria-label': 'New query', onclick: () => openQuery(state.selection) }, icon('file'), h('span', { class: 'lbl' }, 'New query'), h('span', { class: 'shortcut' }, 'Ctrl+T')),
     h('span', { class: 'spacer' }),
-    h('button', { type: 'button', class: 'btn', title: 'Commands and tables (Ctrl+K), tables only (Ctrl+P)', 'aria-label': 'Command palette', onclick: () => commandPalette() }, icon('search'), h('span', { class: 'lbl' }, 'Search'), h('span', { class: 'shortcut' }, 'Ctrl+K')),
+    h('button', { type: 'button', class: 'btn', title: 'Commands, projects, databases and tables (Ctrl+K), tables only (Ctrl+P)', 'aria-label': 'Command palette', onclick: () => commandPalette() }, icon('search'), h('span', { class: 'lbl' }, 'Search'), h('span', { class: 'shortcut' }, 'Ctrl+K')),
     h('button', { type: 'button', class: 'btn icon', 'aria-label': 'Settings', title: 'Settings', onclick: () => actions.settings() }, icon('gear', 16)),
   );
   const main = h('main', { class: 'main' }, breadcrumb, tabbar, content);
@@ -248,7 +248,12 @@ document.addEventListener('keydown', async (e) => {
 });
 
 /** commandPalette (Ctrl+K) lists commands for the current selection, then every loaded table. */
+// themes are fetched ahead, so the palette opens at once and no keystroke is lost
+let themes: Awaited<ReturnType<typeof Go.ListThemes>> = [];
+const loadThemes = () => Go.ListThemes().then((t) => (themes = t ?? [])).catch(() => {});
+
 async function commandPalette() {
+  loadThemes();
   const sel = state.selection;
   const cmds: actions.PaletteItem[] = [
     { label: 'New query', icon: 'file', shortcut: 'Ctrl+T', run: () => openQuery(state.selection) },
@@ -278,7 +283,7 @@ async function commandPalette() {
       { label: `Clone ${sel.db} to…`, run: () => actions.cloneTo(dbSel) },
     );
   }
-  for (const t of await Go.ListThemes().catch(() => [])) {
+  for (const t of themes) {
     cmds.push({ label: `Theme: ${t.name}`, run: async () => {
       const th = await Go.SetTheme(t.id);
       applyTheme(th);
@@ -287,7 +292,7 @@ async function commandPalette() {
       updateStatus();
     } });
   }
-  await actions.palette('Command palette', [...cmds, ...actions.tableItems()], 'Type a command or a table…');
+  await actions.palette('Command palette', [...cmds, ...actions.placeItems(), ...actions.tableItems()], 'Type a command, project, database or table…');
 }
 
 window.addEventListener('beforeunload', (e) => {
@@ -298,6 +303,7 @@ async function start() {
   layout();
   try {
     state.boot = await Go.GetBootstrap();
+    loadThemes();
   } catch (e) {
     showError(e, 'Could not load settings');
     return;

@@ -140,6 +140,16 @@ export class Tree {
     return out;
   }
 
+  /** allDatabases lists the databases of every connected connection. */
+  allDatabases(): Selection[] {
+    return Object.entries(this.nodes).flatMap(([conn, n]) => (n.databases ?? []).map((db): Selection => ({ kind: 'database', conn, db })));
+  }
+
+  /** dbLabel is the tree's hint for a database, e.g. the lerd project it belongs to. */
+  dbLabel(conn: string, db: string) {
+    return this.nodes[conn]?.labels?.[db];
+  }
+
   select(sel: Selection, key: string) {
     this.selectedKey = key;
     state.selection = sel;

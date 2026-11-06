@@ -436,6 +436,15 @@ export function tableItems(): PaletteItem[] {
   return tree.allTables().map((t) => ({ label: t.table!, sub: `${displayName(t.conn)} / ${t.db}`, icon: t.kind === 'view' ? 'view' : 'table', run: () => tree.reveal(t) }));
 }
 
+/** placeItems lists every connection (projects included) and the databases of connected ones. */
+export function placeItems(): PaletteItem[] {
+  const kind = (c: config.Connection) => (c.source === 'lerd-project' ? 'lerd project' : c.source === 'lerd' ? 'lerd service' : c.driver);
+  return [
+    ...state.connections.map((c) => ({ label: displayName(c.name), sub: kind(c), icon: 'link', run: () => tree.reveal({ kind: 'connection', conn: c.name }) })),
+    ...tree.allDatabases().map((d) => ({ label: d.db!, sub: [displayName(d.conn), tree.dbLabel(d.conn, d.db!)].filter(Boolean).join(' · '), icon: 'db', run: () => tree.reveal(d) })),
+  ];
+}
+
 export async function quickSearch() {
   const items = tableItems();
   await palette('Quick search', items, items.length ? 'Table name…' : 'Expand a database first');
