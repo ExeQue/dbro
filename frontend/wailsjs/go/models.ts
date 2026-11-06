@@ -482,6 +482,7 @@ export namespace main {
 	    omarchy: boolean;
 	    askOmarchy: boolean;
 	    configDir: string;
+	    home: string;
 	    executable: string;
 	
 	    static createFrom(source: any = {}) {
@@ -497,6 +498,7 @@ export namespace main {
 	        this.omarchy = source["omarchy"];
 	        this.askOmarchy = source["askOmarchy"];
 	        this.configDir = source["configDir"];
+	        this.home = source["home"];
 	        this.executable = source["executable"];
 	    }
 	

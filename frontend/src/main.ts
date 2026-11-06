@@ -2,7 +2,7 @@ import './style.css';
 import { EventsOn } from '../wailsjs/runtime/runtime';
 import { h, clear, icon } from './util';
 import { Go } from './api';
-import { state, on, emit, connInfo, displayName, type Selection } from './state';
+import { state, on, emit, connInfo, displayName, tildify, type Selection } from './state';
 import { applyTheme, applyFont } from './theme';
 import { Tree } from './tree';
 import { DataTab, welcome } from './datatab';
@@ -153,7 +153,7 @@ async function refresh() {
 function updateStatus() {
   const sel = state.selection;
   const c = sel ? connInfo(sel.conn) : undefined;
-  statusLeft.textContent = c ? `${displayName(c.name)} · ${c.driver}${c.driver === 'sqlite' ? ' · ' + c.file : ` · ${c.host || '127.0.0.1'}${c.port ? ':' + c.port : ''}`}${c.ssh?.host ? ' via ' + c.ssh.host : ''}` : 'No connection selected';
+  statusLeft.textContent = c ? `${displayName(c.name)} · ${c.driver}${c.driver === 'sqlite' ? ' · ' + tildify(c.file) : ` · ${c.host || '127.0.0.1'}${c.port ? ':' + c.port : ''}`}${c.ssh?.host ? ' via ' + c.ssh.host : ''}` : 'No connection selected';
   statusRight.textContent = `MCP: ${c?.hideFromAgents ? 'hidden' : c?.allowAgentWrites ? 'read/write' : 'read-only'} · ${state.boot?.theme?.name ?? ''}`;
 }
 

@@ -106,6 +106,7 @@ type Bootstrap struct {
 	Omarchy    bool            `json:"omarchy"`
 	AskOmarchy bool            `json:"askOmarchy"`
 	ConfigDir  string          `json:"configDir"`
+	Home       string          `json:"home"`
 	Executable string          `json:"executable"`
 }
 
@@ -129,11 +130,12 @@ func (a *App) GetBootstrap() (Bootstrap, error) {
 		t, _ = theme.Load("dbro-dark")
 	}
 	exe, _ := os.Executable()
+	home, _ := os.UserHomeDir()
 	omarchy := theme.OmarchyPath() != ""
 	return Bootstrap{
 		Version: version, Settings: s, Theme: t, Themes: theme.List(),
 		Omarchy: omarchy, AskOmarchy: omarchy && !s.OmarchyAsked && s.Theme != "omarchy",
-		ConfigDir: config.Dir(), Executable: exe,
+		ConfigDir: config.Dir(), Executable: exe, Home: home,
 	}, nil
 }
 

@@ -24,6 +24,12 @@ export function displayName(name: string): string {
   return name.replace(/^lerd project · /, '').replace(/^lerd · /, 'lerd ');
 }
 
+/** tildify shows a path under the home directory as ~/…. */
+export function tildify(path: string): string {
+  const home = state.boot?.home;
+  return home && path.startsWith(home + '/') ? '~' + path.slice(home.length) : path;
+}
+
 export function connInfo(name: string): config.Connection | undefined {
   return state.connections.find((c) => c.name === name);
 }

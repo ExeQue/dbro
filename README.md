@@ -4,6 +4,8 @@
 
 **dbro** is a fast, keyboard-friendly database client for developers, built for Linux and available for macOS and Windows too. It talks to **MySQL, MariaDB, PostgreSQL and SQLite**, finds your local project databases by itself, follows your **[Omarchy](https://omarchy.org)** theme, and ships an **MCP server** so your agents can work with the same databases you do.
 
+<p align="center"><img src="assets/screenshots/data.png" alt="The orders table filtered with a WHERE clause and sorted by total" width="100%"></p>
+
 ## Features
 
 - **Connections** to servers and SQLite files, with SSL/TLS and SSH tunnels. Passwords live in the system keyring, never on disk.
@@ -15,6 +17,27 @@
 - **Themes**: dbro Dark and Light (picked from your system preference on first start), Tokyo Night, Catppuccin, Gruvbox, Nord, your own in `~/.config/dbro/themes/*.toml`, or live sync with Omarchy.
 - **MCP server** for agents (stdio or streamable HTTP): read-only by default, writes only on connections you allow, connections can be hidden.
 - **Headless mode**: `dbro serve` puts the app in a web browser on a port, embeddable in other applications.
+
+## Screenshots
+
+<table>
+  <tr>
+    <td><img src="assets/screenshots/query.png" alt="A query tab with a named :country parameter and its result"></td>
+    <td><img src="assets/screenshots/structure.png" alt="The schema editor for the orders table"></td>
+  </tr>
+  <tr>
+    <td align="center">Queries with named parameters</td>
+    <td align="center">Schema editor with table info</td>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/palette.png" alt="The command palette searching for ord"></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td align="center">Command palette (Ctrl+K)</td>
+    <td></td>
+  </tr>
+</table>
 
 ## Integrations
 

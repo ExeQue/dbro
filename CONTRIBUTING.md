@@ -30,6 +30,16 @@ DBRO_TEST_LERD=1 make test
 
 The tests create and drop their own `dbro_selftest` databases. CI runs the same setup on every push and pull request.
 
+## Screenshots
+
+The README screenshots are generated, so they can be refreshed whenever the UI changes:
+
+```sh
+make screenshots
+```
+
+It builds dbro, serves it headless with a demo shop database (`scripts/screenshots/demo.py`) and a throwaway home and config, and clicks through it with Playwright (`scripts/screenshots/shoot.mjs`). It needs Python 3 and Chromium or Chrome (set `CHROME` to pick one). If a step fails, the script saves `assets/screenshots/_failed.png` showing where it got stuck.
+
 ## Layout
 
 - `app.go`: the methods the frontend calls (Wails bindings); `serve.go` exposes the same methods over HTTP.

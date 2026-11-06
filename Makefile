@@ -16,7 +16,10 @@ install: build
 	install -Dm644 build/appicon.png $(PREFIX)/share/icons/hicolor/1024x1024/apps/dbro.png
 	-update-desktop-database $(PREFIX)/share/applications 2>/dev/null
 
+screenshots:
+	scripts/screenshots.sh
+
 uninstall:
 	rm -f $(PREFIX)/bin/dbro $(PREFIX)/share/applications/dbro.desktop $(PREFIX)/share/icons/hicolor/1024x1024/apps/dbro.png
 
-.PHONY: build dev test install uninstall
+.PHONY: build dev test install uninstall screenshots

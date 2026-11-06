@@ -184,7 +184,7 @@ export class StructureTab {
           return el;
         };
         append(tr,
-          h('td', { class: 'muted' }, String(i + 1), pk.has(r.orig?.name ?? '') ? h('span', { class: 'key', title: 'primary key' }, ' ', icon('key', 11)) : null),
+          h('td', { class: 'muted', style: { whiteSpace: 'nowrap' } }, String(i + 1), pk.has(r.orig?.name ?? '') ? h('span', { class: 'key', title: 'primary key' }, ' ', icon('key', 11)) : null),
           h('td', {}, inp('name')),
           typeCells(),
           h('td', {}, chk('nullable')),
