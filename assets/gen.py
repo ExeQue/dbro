@@ -1,9 +1,10 @@
 """Generate dbro artwork SVGs with all text converted to paths."""
+import os
 import sys
 from fontTools.ttLib import TTFont
 from fontTools.pens.svgPathPen import SVGPathPen
 
-OUT = "/home/exe/Work/dbro/assets"
+OUT = os.path.dirname(os.path.abspath(__file__))
 F = "/usr/share/fonts/noto/"
 BLACK, MED, MONO = F + "NotoSans-Black.ttf", F + "NotoSans-Medium.ttf", F + "NotoSansMono-Bold.ttf"
 
