@@ -12,6 +12,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
 
 	"github.com/ExeQue/dbro/internal/mcpserver"
+	"github.com/ExeQue/dbro/internal/update"
 )
 
 //go:embed all:frontend/dist
@@ -32,6 +33,7 @@ Usage:
   dbro serve [--addr 127.0.0.1:7810]
                   headless: the app in a web browser, plus MCP at /mcp
   dbro version    print the version
+  dbro update     install the latest release
 
 Beyond loopback a token is required: set DBRO_TOKEN, or dbro prints a fresh one.
 
@@ -62,6 +64,12 @@ func main() {
 		case "version", "--version":
 			fmt.Println(version)
 			return
+		case "update":
+			if err := selfUpdate(); err != nil {
+				fmt.Fprintln(os.Stderr, "dbro update:", err)
+				os.Exit(1)
+			}
+			return
 		case "help", "--help", "-h":
 			fmt.Print(usage)
 			return
@@ -76,6 +84,7 @@ func main() {
 		}
 	}
 
+	update.Cleanup()
 	app := NewApp()
 	err := wails.Run(&options.App{
 		Title:  "dbro",
@@ -98,4 +107,23 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}
+}
+
+// selfUpdate is "dbro update": install the latest release over this binary.
+func selfUpdate() error {
+	ctx := context.Background()
+	r, err := update.Latest(ctx, version)
+	if err != nil {
+		return err
+	}
+	if !r.Available {
+		fmt.Printf("dbro %s is the latest version.\n", version)
+		return nil
+	}
+	fmt.Printf("Installing dbro %s (running %s)...\n", r.Version, version)
+	if err := update.Install(ctx, r); err != nil {
+		return err
+	}
+	fmt.Println("Done. Restart dbro to use it.")
+	return nil
 }

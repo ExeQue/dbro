@@ -125,6 +125,10 @@ go install github.com/wailsapp/wails/v2/cmd/wails@latest
 make install        # builds and installs to ~/.local (binary, .desktop file, icon)
 ```
 
+### Updating
+
+dbro checks for a new release on startup (turn it off in Settings) and offers to update itself: it downloads the release for your platform, checks its SHA-256 and replaces itself, and the new version runs after a restart. `dbro update` does the same from a terminal. A copy installed by a package manager (under `/usr`) is left to that package manager.
+
 ## Themes
 
 Seven built-in themes, light or dark from your system, live [Omarchy](https://omarchy.org) sync, and your own themes as TOML files. See [docs/themes.md](docs/themes.md) for the gallery and the theme format.

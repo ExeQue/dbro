@@ -5,7 +5,8 @@ import { modal, confirm, prompt, toast, showError, errorMessage, field, type Men
 import { state, emit, connInfo, dialect, quoteIdent, displayName, type Selection } from './state';
 import { applyTheme, currentTheme, applyFont } from './theme';
 import type { Tree } from './tree';
-import { config, db } from '../wailsjs/go/models';
+import { config, db, type update } from '../wailsjs/go/models';
+import { BrowserOpenURL } from '../wailsjs/runtime/runtime';
 
 let tree: Tree;
 export function bindTree(t: Tree) {
@@ -492,6 +493,7 @@ export async function settings() {
   const lerdConnect = h('input', { type: 'checkbox', checked: boot.settings.lerdAutoConnect });
   const font = h('input', { class: 'input', value: boot.settings.font ?? '', placeholder: 'monospace (from fontconfig)' });
   const timeout = h('input', { class: 'input', value: boot.settings.queryTimeout, inputmode: 'numeric' });
+  const updates = h('input', { type: 'checkbox', checked: boot.settings.checkUpdates });
   const exe = boot.executable || 'dbro';
   const mcpCmd = `claude mcp add dbro -- ${exe} mcp`;
   const r = await modal('Settings', h('div', { class: 'form' },
@@ -507,12 +509,16 @@ export async function settings() {
     h('div', { class: 'form-row' }, field('Font', font), field('Agent query timeout (seconds)', timeout)),
     h('label', { class: 'check' }, lerd, ' Show lerd database services in the tree'),
     h('label', { class: 'check' }, lerdConnect, ' Connect to lerd on startup'),
+    h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center' } },
+      h('label', { class: 'check' }, updates, ' Check for updates on startup'),
+      h('span', { class: 'muted' }, `dbro ${boot.version}`),
+      h('button', { type: 'button', class: 'btn small', onclick: () => checkUpdate(true) }, 'Check now')),
     h('fieldset', {}, h('legend', {}, 'MCP server for agents'),
       h('p', { class: 'muted' }, 'Agents get read-only access to your saved connections. Writes need "Allow agents to change data" on the connection.'),
       h('div', { style: { display: 'flex', gap: '6px' } }, h('code', { style: { flex: '1', userSelect: 'all' } }, mcpCmd), h('button', { type: 'button', class: 'btn small', onclick: () => { Go.CopyText(mcpCmd); toast('Copied'); } }, 'Copy')),
       h('p', { class: 'muted' }, 'Over HTTP: ', h('code', {}, `${exe} mcp --http`), ' or the headless ', h('code', {}, `${exe} serve`), ' (also at /mcp).')),
   ), [{ label: 'Cancel' }, { label: 'Save', primary: true, action: async () => {
-    const s = { ...boot.settings, lerd: lerd.checked, lerdAutoConnect: lerdConnect.checked, font: font.value.trim(), queryTimeout: Number(timeout.value) || 30 };
+    const s = { ...boot.settings, lerd: lerd.checked, lerdAutoConnect: lerdConnect.checked, checkUpdates: updates.checked, font: font.value.trim(), queryTimeout: Number(timeout.value) || 30 };
     await Go.SaveSettings(s as any);
     const t = await Go.SetTheme(chosen);
     applyTheme(t);
@@ -557,5 +563,36 @@ export async function generateSQL(sel: Selection, kind: 'SELECT' | 'INSERT' | 'U
     openQuery({ kind: 'database', conn: sel.conn, db: sel.db }, sql);
   } catch (e) {
     showError(e);
+  }
+}
+
+// ---- updates ----
+
+/** checkUpdate looks for a newer release; quiet on startup, with feedback when asked for. */
+export async function checkUpdate(manual = false) {
+  try {
+    const r = await Go.CheckUpdate();
+    if (r.available) emit('updateAvailable', r);
+    if (manual) {
+      if (r.available) await installUpdate(r);
+      else toast(`dbro ${state.boot.version} is the latest version`);
+    }
+  } catch (e) {
+    if (manual) showError(e, 'Could not check for updates');
+  }
+}
+
+export async function installUpdate(r: update.Release) {
+  const notes = h('a', { href: r.url, onclick: (e: Event) => { e.preventDefault(); BrowserOpenURL(r.url); } }, 'Release notes');
+  if (!r.installable) {
+    await modal(`dbro ${r.version} is available`, h('div', {}, h('p', {}, `You have ${state.boot.version}. dbro cannot update itself here: ${r.reason}.`), h('p', {}, notes)));
+    return;
+  }
+  const ok = await modal(`dbro ${r.version} is available`, h('div', {}, h('p', {}, `You have ${state.boot.version}. dbro downloads the new version, checks it and replaces itself.`), h('p', {}, notes)),
+    [{ label: 'Later' }, { label: 'Update', primary: true, action: () => Go.InstallUpdate() }]);
+  if (ok !== 1) return;
+  emit('updateInstalled', r);
+  if (await confirm('Update installed', `dbro ${r.version} is installed. Restart now to use it?`, 'Restart')) {
+    await Go.Restart().catch((e) => showError(e, 'Could not restart'));
   }
 }

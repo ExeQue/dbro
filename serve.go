@@ -41,6 +41,7 @@ const headlessJS = `(() => {
       return () => (on[n] = on[n].filter((x) => x !== f));
     },
     EventsOff: (n) => delete on[n],
+    BrowserOpenURL: (u) => window.open(u, '_blank', 'noopener'),
     LogInfo: () => {},
     LogError: () => {},
   };

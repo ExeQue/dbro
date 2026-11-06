@@ -11,7 +11,7 @@ import { QueryTab } from './query';
 import { dialogOpen, confirm, toast, showError } from './dialogs';
 import * as actions from './actions';
 import { logo } from './logo';
-import type { theme } from '../wailsjs/go/models';
+import type { theme, update } from '../wailsjs/go/models';
 
 type TabId = 'data' | 'structure' | string;
 
@@ -29,6 +29,8 @@ const content = h('div', { class: 'pane' });
 const logBox = h('section', { class: 'log', 'aria-label': 'SQL log' });
 const statusLeft = h('span');
 const statusRight = h('span', { class: 'right' });
+const versionButton = h('button', { type: 'button', class: 'btn small', title: 'Check for updates', onclick: () => (pendingUpdate ? actions.installUpdate(pendingUpdate) : actions.checkUpdate(true)) });
+let pendingUpdate: update.Release | null = null;
 
 function layout() {
   const sidebar = h('div', { class: 'sidebar' }, tree.root);
@@ -60,7 +62,7 @@ function layout() {
     toolbar,
     h('div', { class: 'body' }, sidebar, resizer, main),
     logBox,
-    h('footer', { class: 'statusbar' }, statusLeft, h('span', { class: 'right' }, statusRight, logToggle)));
+    h('footer', { class: 'statusbar' }, statusLeft, h('span', { class: 'right' }, statusRight, versionButton, logToggle)));
 }
 
 function renderTabs() {
@@ -199,6 +201,16 @@ on('reloadData', () => data.load());
 on('schemaChanged', () => {
   if (state.selection?.table) data.show(state.selection, true);
 });
+on('updateAvailable', (r: update.Release) => {
+  pendingUpdate = r;
+  versionButton.textContent = `Update to ${r.version}`;
+  versionButton.classList.add('primary');
+});
+on('updateInstalled', (r: update.Release) => {
+  pendingUpdate = null;
+  versionButton.textContent = `${r.version} on restart`;
+  versionButton.classList.remove('primary');
+});
 on('themeChanged', (t: theme.Theme) => {
   state.boot.theme = t;
   updateStatus();
@@ -261,6 +273,7 @@ async function commandPalette() {
     { label: 'Refresh', icon: 'refresh', shortcut: 'F5', run: () => refresh() },
     { label: 'Settings', icon: 'gear', shortcut: 'Ctrl+,', run: () => actions.settings() },
     { label: 'Toggle SQL log', run: () => logBox.classList.toggle('collapsed') },
+    { label: 'Check for updates', icon: 'refresh', run: () => actions.checkUpdate(true) },
   ];
   if (sel && (sel.kind === 'table' || sel.kind === 'view')) {
     const t = sel.table!;
@@ -327,6 +340,8 @@ async function start() {
   showTab('data');
   updateStatus();
   if (state.boot.askOmarchy) actions.askOmarchy();
+  versionButton.textContent = state.boot.version;
+  if (state.boot.settings.checkUpdates && state.boot.version !== 'dev') actions.checkUpdate();
 }
 
 start();
