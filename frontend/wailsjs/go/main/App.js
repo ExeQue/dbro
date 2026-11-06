@@ -22,6 +22,10 @@ export function CancelQuery(arg1) {
   return window['go']['main']['App']['CancelQuery'](arg1);
 }
 
+export function CheckUpdate() {
+  return window['go']['main']['App']['CheckUpdate']();
+}
+
 export function Clone(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['Clone'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
@@ -114,6 +118,10 @@ export function ImportSQL(arg1, arg2, arg3) {
   return window['go']['main']['App']['ImportSQL'](arg1, arg2, arg3);
 }
 
+export function InstallUpdate() {
+  return window['go']['main']['App']['InstallUpdate']();
+}
+
 export function ListConnections() {
   return window['go']['main']['App']['ListConnections']();
 }
@@ -160,6 +168,10 @@ export function ProvidePassword(arg1, arg2, arg3, arg4) {
 
 export function ResolveLaravel(arg1) {
   return window['go']['main']['App']['ResolveLaravel'](arg1);
+}
+
+export function Restart() {
+  return window['go']['main']['App']['Restart']();
 }
 
 export function RoutineSource(arg1, arg2, arg3) {

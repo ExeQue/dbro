@@ -93,6 +93,7 @@ export namespace config {
 	    lerdAutoConnect: boolean;
 	    firstRunDone: boolean;
 	    queryTimeout: number;
+	    checkUpdates: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -107,6 +108,7 @@ export namespace config {
 	        this.lerdAutoConnect = source["lerdAutoConnect"];
 	        this.firstRunDone = source["firstRunDone"];
 	        this.queryTimeout = source["queryTimeout"];
+	        this.checkUpdates = source["checkUpdates"];
 	    }
 	}
 
@@ -705,6 +707,31 @@ export namespace theme {
 	        this.name = source["name"];
 	        this.source = source["source"];
 	        this.colors = source["colors"];
+	    }
+	}
+
+}
+
+export namespace update {
+	
+	export class Release {
+	    version: string;
+	    url: string;
+	    available: boolean;
+	    installable: boolean;
+	    reason?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Release(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.url = source["url"];
+	        this.available = source["available"];
+	        this.installable = source["installable"];
+	        this.reason = source["reason"];
 	    }
 	}
 

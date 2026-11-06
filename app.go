@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -23,6 +24,7 @@ import (
 	"github.com/ExeQue/dbro/internal/sqllog"
 	"github.com/ExeQue/dbro/internal/sshtunnel"
 	"github.com/ExeQue/dbro/internal/theme"
+	"github.com/ExeQue/dbro/internal/update"
 )
 
 // App is bound to the frontend; every exported method is callable from TypeScript.
@@ -848,4 +850,33 @@ func (a *App) TableInfo(name, database, schema, table string) ([]db.InfoItem, er
 		return nil, err
 	}
 	return c.TableInfo(a.ctx, database, schema, table)
+}
+
+// CheckUpdate looks up the latest release on GitHub.
+func (a *App) CheckUpdate() (update.Release, error) {
+	return update.Latest(a.ctx, version)
+}
+
+// InstallUpdate replaces dbro with the latest release; it runs from the next start.
+func (a *App) InstallUpdate() (string, error) {
+	r, err := update.Latest(a.ctx, version)
+	if err != nil {
+		return "", err
+	}
+	if !r.Available {
+		return "", fmt.Errorf("dbro %s is the latest version", version)
+	}
+	return r.Version, update.Install(a.ctx, r)
+}
+
+// Restart starts the installed version and closes this one.
+func (a *App) Restart() error {
+	if a.headless != nil {
+		return errors.New("restart dbro serve to run the new version")
+	}
+	if err := exec.Command(update.Executable(), os.Args[1:]...).Start(); err != nil {
+		return err
+	}
+	runtime.Quit(a.ctx)
+	return nil
 }

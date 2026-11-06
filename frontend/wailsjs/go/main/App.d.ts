@@ -3,6 +3,7 @@
 import {theme} from '../models';
 import {db} from '../models';
 import {main} from '../models';
+import {update} from '../models';
 import {config} from '../models';
 import {history} from '../models';
 
@@ -15,6 +16,8 @@ export function ApplySchema(arg1:string,arg2:string,arg3:Array<string>):Promise<
 export function Browse(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:Array<db.SortKey>,arg7:number,arg8:number):Promise<main.BrowseResult>;
 
 export function CancelQuery(arg1:string):Promise<void>;
+
+export function CheckUpdate():Promise<update.Release>;
 
 export function Clone(arg1:string,arg2:string,arg3:Array<db.TableInfo>,arg4:string,arg5:string,arg6:string,arg7:db.CloneOptions):Promise<string>;
 
@@ -62,6 +65,8 @@ export function ImportCSV(arg1:string,arg2:string,arg3:string,arg4:string,arg5:s
 
 export function ImportSQL(arg1:string,arg2:string,arg3:boolean):Promise<string>;
 
+export function InstallUpdate():Promise<string>;
+
 export function ListConnections():Promise<main.ConnectionList>;
 
 export function ListThemes():Promise<Array<theme.Info>>;
@@ -85,6 +90,8 @@ export function PreviewTheme(arg1:string):Promise<theme.Theme>;
 export function ProvidePassword(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<void>;
 
 export function ResolveLaravel(arg1:string):Promise<config.Connection>;
+
+export function Restart():Promise<void>;
 
 export function RoutineSource(arg1:string,arg2:string,arg3:db.Routine):Promise<string>;
 

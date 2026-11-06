@@ -58,6 +58,7 @@ type Settings struct {
 	LerdConnect  bool   `toml:"lerd_auto_connect" json:"lerdAutoConnect"` // connect to them on startup
 	FirstRunDone bool   `toml:"first_run_done,omitempty" json:"firstRunDone"`
 	QueryTimeout int    `toml:"query_timeout,omitempty" json:"queryTimeout"` // seconds
+	CheckUpdates bool   `toml:"check_updates" json:"checkUpdates"`           // look for a new release on startup
 }
 
 // Dir returns the config directory, honoring DBRO_CONFIG_DIR and XDG_CONFIG_HOME.
@@ -121,7 +122,7 @@ func SaveConnections(conns []Connection) error {
 
 // LoadSettings reads config.toml with defaults for missing values.
 func LoadSettings() (Settings, error) {
-	s := Settings{Lerd: true, LerdConnect: true, QueryTimeout: 30}
+	s := Settings{Lerd: true, LerdConnect: true, QueryTimeout: 30, CheckUpdates: true}
 	_, err := toml.DecodeFile(filepath.Join(Dir(), "config.toml"), &s)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return s, fmt.Errorf("read config.toml: %w", err)
