@@ -1,6 +1,6 @@
 <p align="center"><img src="assets/banner.svg" alt="dbro: your database bro" width="100%"></p>
 
-**dbro** is a fast, keyboard-friendly database client for developers on Linux. It talks to **MySQL, MariaDB, PostgreSQL and SQLite**, finds your local project databases by itself, follows your **Omarchy** theme, and ships an **MCP server** so your agents can work with the same databases you do.
+**dbro** is a fast, keyboard-friendly database client for developers, built for Linux and available for macOS and Windows too. It talks to **MySQL, MariaDB, PostgreSQL and SQLite**, finds your local project databases by itself, follows your **Omarchy** theme, and ships an **MCP server** so your agents can work with the same databases you do.
 
 ## Features
 
@@ -17,7 +17,22 @@
 
 ## Install
 
-Needs Go, Node, the Wails CLI and `webkit2gtk-4.1` (already on Omarchy).
+Download a build from [Releases](https://github.com/ExeQue/dbro/releases):
+
+- **Linux** (amd64, arm64): needs `webkit2gtk-4.1` (already on Omarchy). Unpack, then
+  ```sh
+  install -Dm755 dbro ~/.local/bin/dbro
+  install -Dm644 dbro.desktop ~/.local/share/applications/dbro.desktop
+  install -Dm644 dbro.png ~/.local/share/icons/hicolor/1024x1024/apps/dbro.png
+  ```
+- **macOS** (universal): move `dbro.app` to Applications. The build is not notarized, so clear the quarantine flag once: `xattr -dr com.apple.quarantine /Applications/dbro.app`.
+- **Windows** (amd64): run `dbro.exe`. It needs the WebView2 runtime (part of Windows 11). The build is not signed, so SmartScreen asks once.
+
+lerd and Omarchy integration only apply on Linux; everything else works on all three.
+
+### From source
+
+Needs Go, Node, the Wails CLI and, on Linux, `webkit2gtk-4.1`.
 
 ```sh
 go install github.com/wailsapp/wails/v2/cmd/wails@latest

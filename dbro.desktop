@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=dbro
-GenericName=SQL Browser
+GenericName=Database Client
 Comment=Your database bro. Browse MySQL, MariaDB, PostgreSQL and SQLite.
 Exec=dbro
 Icon=dbro

@@ -76,7 +76,7 @@ open(f"{OUT}/logo.svg", "w").write(svg(512, 512, mark(), "dbro logo"))
 # banner 1280x400, self-contained dark background
 W, H = 1280, 400
 wm, wmw = wordmark(0, 0, 168)
-tag, tagw = text(MED, "Your database bro. A simple SQL browser for Linux.", 0, 0, 34, MUTED)
+tag, tagw = text(MED, "Your database bro. A fast database client for developers.", 0, 0, 34, MUTED)
 ms, gap = 236, 56
 content_w = ms + gap + max(wmw, tagw)
 x0 = (W - content_w) / 2
@@ -86,12 +86,12 @@ banner = (f'<rect width="{W}" height="{H}" rx="28" fill="{INK}"/>'
           + placed_mark(x0, (H - ms) / 2, ms)
           + f'<g transform="translate({tx} 226)">{wm}</g>'
           + f'<g transform="translate({tx + 6} 292)">{tag}</g>')
-open(f"{OUT}/banner.svg", "w").write(svg(W, H, banner, "dbro: Your database bro. A simple SQL browser for Linux."))
+open(f"{OUT}/banner.svg", "w").write(svg(W, H, banner, "dbro: Your database bro. A fast database client for developers."))
 
 # social preview 1280x640
 W, H = 1280, 640
 wm, wmw = wordmark(0, 0, 200)
-tag, tagw = text(MED, "Your database bro. A simple SQL browser for Linux.", 0, 0, 38, MUTED)
+tag, tagw = text(MED, "Your database bro. A fast database client for developers.", 0, 0, 38, MUTED)
 chips_s = "MySQL  ·  MariaDB  ·  PostgreSQL  ·  SQLite  ·  MCP"
 chips, chipw = text(MONO, chips_s, 0, 0, 26, RED)
 ms, gap = 260, 60

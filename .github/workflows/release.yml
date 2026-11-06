@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - target: linux-amd64
+            runner: ubuntu-24.04
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+          - target: macos-universal
+            runner: macos-15
+          - target: windows-amd64
+            runner: windows-2025
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # git describe needs the tags for the version
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: System libraries
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v2)
+      - name: Build
+        run: |
+          flags="-s -w -X main.version=$(git describe --tags --always)"
+          case "${{ runner.os }}" in
+            Linux)   wails build -tags webkit2_41 -trimpath -ldflags "$flags" ;;
+            macOS)   wails build -platform darwin/universal -trimpath -ldflags "$flags" ;;
+            Windows) wails build -platform windows/amd64 -trimpath -ldflags "$flags" ;;
+          esac
+      - name: Package
+        run: |
+          name=dbro-${GITHUB_REF_NAME}-${{ matrix.target }}
+          mkdir -p dist
+          case "${{ runner.os }}" in
+            Linux)
+              mkdir -p dist/$name
+              cp build/bin/dbro dbro.desktop README.md dist/$name/
+              cp build/appicon.png dist/$name/dbro.png
+              tar -C dist -czf dist/$name.tar.gz $name
+              file=$name.tar.gz ;;
+            macOS)
+              ditto -c -k --keepParent build/bin/dbro.app dist/$name.zip
+              file=$name.zip ;;
+            Windows)
+              7z a dist/$name.zip ./build/bin/dbro.exe README.md
+              file=$name.zip ;;
+          esac
+          cd dist && shasum -a 256 $file > $file.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            dist/*.tar.gz*
+            dist/*.zip*
+
+  release:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes --verify-tag *.tar.gz* *.zip*

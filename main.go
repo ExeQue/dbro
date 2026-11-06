@@ -22,7 +22,7 @@ var icon []byte
 
 var version = "dev"
 
-const usage = `dbro: a simple SQL browser for Linux.
+const usage = `dbro: a fast database client for developers.
 
 Usage:
   dbro            open the app
