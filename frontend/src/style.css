@@ -123,8 +123,8 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .filter-bar { background: var(--dark-background); }
 .pane-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex: none; }
-.empty { flex: 1; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; color: var(--dark-foreground); text-align: center; padding: 20px; }
-.empty .logo { width: 88px; height: 88px; opacity: 0.9; }
+div.empty { flex: 1; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; color: var(--dark-foreground); text-align: center; padding: 20px; }
+div.empty .logo { width: 88px; height: 88px; opacity: 0.9; }
 
 /* ---- grid ---- */
 .grid-wrap { flex: 1; min-height: 0; display: flex; flex-direction: column; }
