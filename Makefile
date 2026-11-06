@@ -8,7 +8,7 @@ dev:
 	wails dev -tags $(TAGS)
 
 test:
-	go test ./...
+	go test -tags $(TAGS) ./...
 
 install: build
 	install -Dm755 build/bin/dbro $(PREFIX)/bin/dbro

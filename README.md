@@ -149,9 +149,11 @@ DBRO_TOKEN=secret dbro serve --addr 0.0.0.0:7810
 ## Development
 
 ```sh
-make dev     # wails dev with hot reload
-make test    # go test ./... (set DBRO_TEST_LERD=1 to also test against Lerd's MySQL and PostgreSQL)
+make dev     # the app with hot reload
+make test    # Go tests
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, running the MySQL and PostgreSQL tests, and guidelines.
 
 ## License
 
