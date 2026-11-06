@@ -406,7 +406,7 @@ export async function palette(title: string, items: PaletteItem[], placeholder: 
   let idx = 0;
   const render = () => {
     const q = input.value.toLowerCase().trim();
-    hits = (q ? items.filter((it) => fuzzy(q, (it.label + ' ' + (it.sub ?? '')).toLowerCase())) : items).slice(0, 60);
+    hits = (q ? rank(q, items) : items).slice(0, 60);
     idx = Math.min(idx, Math.max(hits.length - 1, 0));
     clear(list, hits.length ? hits.map((it, i) => h('button', { type: 'button', role: 'option', 'aria-selected': String(i === idx), class: 'list-item' + (i === idx ? ' on' : ''), onclick: () => go(it) },
       it.icon ? icon(it.icon) : h('span', { class: 'list-icon' }), h('span', { class: 'list-label' }, it.label), it.sub ? h('span', { class: 'sub' }, it.sub) : null, it.shortcut ? h('span', { class: 'kbd' }, it.shortcut) : null))
@@ -448,6 +448,18 @@ export function placeItems(): PaletteItem[] {
 export async function quickSearch() {
   const items = tableItems();
   await palette('Quick search', items, items.length ? 'Table name…' : 'Expand a database first');
+}
+
+/** rank keeps the items matching q, best first: exact name, name prefix, name substring, then fuzzy. */
+function rank(q: string, items: PaletteItem[]): PaletteItem[] {
+  const score = (it: PaletteItem) => {
+    const label = it.label.toLowerCase();
+    if (label === q) return 0;
+    if (label.startsWith(q)) return 1;
+    if (label.includes(q)) return 2;
+    return fuzzy(q, (label + ' ' + (it.sub ?? '')).toLowerCase()) ? 3 : -1;
+  };
+  return items.map((it, i) => ({ it, i, s: score(it) })).filter((x) => x.s >= 0).sort((a, b) => a.s - b.s || a.i - b.i).map((x) => x.it);
 }
 
 function fuzzy(q: string, s: string) {

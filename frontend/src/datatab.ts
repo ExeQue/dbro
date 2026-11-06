@@ -4,7 +4,7 @@ import { h, clear, icon, formatCount, formatBytes, debounce } from './util';
 import { Go, forConn } from './api';
 import { Grid, nextSort, type SortKey } from './grid';
 import { dropdown, toast, errorMessage, confirm, showError, modal } from './dialogs';
-import { state, connInfo, quoteIdent, dialect, type Selection } from './state';
+import { state, connInfo, tildify, quoteIdent, dialect, type Selection } from './state';
 import * as actions from './actions';
 import { logo } from './logo';
 import { whereField } from './wherefield';
@@ -282,7 +282,7 @@ export class DataTab {
     if (!c) return;
     const rows: [string, string][] = [
       ['Driver', c.driver], ['Source', c.source + (c.label ? ` (${c.label})` : '')],
-      c.driver === 'sqlite' ? ['File', c.file] : ['Server', `${c.host || '127.0.0.1'}:${c.port || ''}`],
+      c.driver === 'sqlite' ? ['File', tildify(c.file)] : ['Server', `${c.host || '127.0.0.1'}:${c.port || ''}`],
       ['User', c.user ?? ''], ['Default database', c.database ?? ''],
       ['SSH tunnel', c.ssh?.host ? `${c.ssh.user ? c.ssh.user + '@' : ''}${c.ssh.host}` : 'no'],
       ['Agents (MCP)', c.hideFromAgents ? 'hidden' : c.allowAgentWrites ? 'read and write' : 'read-only'],

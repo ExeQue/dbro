@@ -201,7 +201,7 @@ export class Grid {
         const text = cellText(v);
         td.textContent = v === '' ? '(empty)' : text.length > 300 ? text.slice(0, 300) + '…' : text;
         if (text.length > 40) td.title = text.length > 2000 ? text.slice(0, 2000) + '…' : text;
-        let cls = v === null || v === undefined ? 'null' : v === '' ? 'empty' : isNum[c] ? 'num' : '';
+        let cls = v === null || v === undefined ? 'null' : v === '' ? 'empty' : isNum[c] || (!this.types[c] && typeof v === 'number') ? 'num' : '';
         if (changed) cls += ' changed';
         if (fkCols.has(col)) cls += ' fk';
         if (r === this.cur.r && c === this.cur.c) cls += ' cur';
