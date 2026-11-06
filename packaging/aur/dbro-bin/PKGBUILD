@@ -1,0 +1,27 @@
+# Maintainer: Morten Harders <mmh@harders-it.dk>
+pkgname=dbro-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Fast, keyboard-friendly database client for MySQL, MariaDB, PostgreSQL and SQLite, with an MCP server for agents"
+arch=(x86_64 aarch64)
+url="https://github.com/ExeQue/dbro"
+license=(MIT)
+depends=(gtk3 webkit2gtk-4.1)
+optdepends=('org.freedesktop.secrets: keep connection passwords in the system keyring')
+provides=(dbro)
+conflicts=(dbro)
+options=(!debug !strip)
+source_x86_64=("$url/releases/download/v$pkgver/dbro-v$pkgver-linux-amd64.tar.gz")
+source_aarch64=("$url/releases/download/v$pkgver/dbro-v$pkgver-linux-arm64.tar.gz")
+sha256sums_x86_64=('SKIP')
+sha256sums_aarch64=('SKIP')
+
+package() {
+  local arch=amd64
+  [[ $CARCH == aarch64 ]] && arch=arm64
+  cd dbro-v$pkgver-linux-$arch
+  install -Dm755 dbro "$pkgdir/usr/bin/dbro"
+  install -Dm644 dbro.desktop "$pkgdir/usr/share/applications/dbro.desktop"
+  install -Dm644 dbro.png "$pkgdir/usr/share/icons/hicolor/1024x1024/apps/dbro.png"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
