@@ -49,9 +49,12 @@ The tests create and drop their own `dbro_selftest` databases. CI runs the same 
 
 ## Pull requests
 
+Every change goes through a pull request, maintainers' included: `main` only accepts merged pull requests with green CI.
+
+- Branch from `main`, e.g. `feat/column-resize` or `fix/explain-quoting`.
 - One change per pull request, with a short description of what and why. Screenshots help for UI changes.
-- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org): `feat(grid): resize columns`, `fix(postgres): quote identifiers in EXPLAIN`.
-- CI must be green.
+- Commit messages follow [Conventional Commits](https://www.conventionalcommits.org): `feat(grid): resize columns`, `fix(postgres): quote identifiers in EXPLAIN`. The pull request title follows the same format, since it becomes the commit message when squash-merged.
+- CI (tests on Linux, builds on Linux arm64, macOS and Windows) must pass before merging.
 
 Releases are cut by tagging `vX.Y.Z`; the release workflow builds and publishes everything.
 
