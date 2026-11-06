@@ -1,6 +1,6 @@
 # Maintainer: Morten Harders <mmh@harders-it.dk>
 pkgname=dbro-bin
-pkgver=0.1.2
+pkgver=0.1.3
 pkgrel=1
 pkgdesc="Fast, keyboard-friendly database client for MySQL, MariaDB, PostgreSQL and SQLite, with an MCP server for agents"
 arch=(x86_64 aarch64)
@@ -13,8 +13,8 @@ conflicts=(dbro)
 options=(!debug !strip)
 source_x86_64=("$url/releases/download/v$pkgver/dbro-v$pkgver-linux-amd64.tar.gz")
 source_aarch64=("$url/releases/download/v$pkgver/dbro-v$pkgver-linux-arm64.tar.gz")
-sha256sums_x86_64=('cb43d8ae228737575c97cc8c213ebb5b25422f36d939f1ef05dc2985fd831aa1')
-sha256sums_aarch64=('24e38f4214eb16bcb7962dc4d1a6b3b3dd8d08d971c4e5b68903cc6b6dadab61')
+sha256sums_x86_64=('4e214c1700a21aa158ea2f71304347a83321b0848290eccd2057f7af75c55ccf')
+sha256sums_aarch64=('903fd65d5e46a5e47da9b2930b3b61b896f2fba9268631211203f5f1f209e3c4')
 
 package() {
   local arch=amd64
