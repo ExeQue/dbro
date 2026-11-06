@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -192,7 +193,7 @@ func (a *App) SaveThemeAs(name string, colors map[string]string) (string, error)
 // SaveSettings stores settings (theme changes go through SetTheme).
 func (a *App) SaveSettings(s config.Settings) error {
 	cur, _ := config.LoadSettings()
-	s.Theme, s.FirstRunDone, s.OmarchyAsked = cur.Theme, cur.FirstRunDone, cur.OmarchyAsked
+	s.Theme, s.FirstRunDone, s.OmarchyAsked, s.AgentWrites = cur.Theme, cur.FirstRunDone, cur.OmarchyAsked, cur.AgentWrites
 	return config.SaveSettings(s)
 }
 
@@ -879,4 +880,17 @@ func (a *App) Restart() error {
 	}
 	runtime.Quit(a.ctx)
 	return nil
+}
+
+// SetAgentWrites lets agents change data on a lerd connection, or makes it read-only again.
+func (a *App) SetAgentWrites(name string, allow bool) error {
+	s, err := config.LoadSettings()
+	if err != nil {
+		return err
+	}
+	s.AgentWrites = slices.DeleteFunc(s.AgentWrites, func(n string) bool { return n == name })
+	if allow {
+		s.AgentWrites = append(s.AgentWrites, name)
+	}
+	return config.SaveSettings(s)
 }

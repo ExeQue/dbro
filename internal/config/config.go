@@ -59,6 +59,8 @@ type Settings struct {
 	FirstRunDone bool   `toml:"first_run_done,omitempty" json:"firstRunDone"`
 	QueryTimeout int    `toml:"query_timeout,omitempty" json:"queryTimeout"` // seconds
 	CheckUpdates bool   `toml:"check_updates" json:"checkUpdates"`           // look for a new release on startup
+	// AgentWrites names the lerd connections agents may change; they cannot be edited like saved ones.
+	AgentWrites []string `toml:"agent_writes,omitempty" json:"agentWrites"`
 }
 
 // Dir returns the config directory, honoring DBRO_CONFIG_DIR and XDG_CONFIG_HOME.

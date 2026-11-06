@@ -105,6 +105,8 @@ export function SaveSnippet(arg1:history.Snippet):Promise<void>;
 
 export function SaveThemeAs(arg1:string,arg2:Record<string, string>):Promise<string>;
 
+export function SetAgentWrites(arg1:string,arg2:boolean):Promise<void>;
+
 export function SetTheme(arg1:string):Promise<theme.Theme>;
 
 export function Snippets():Promise<Array<history.Snippet>>;

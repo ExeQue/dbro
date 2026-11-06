@@ -94,6 +94,7 @@ export namespace config {
 	    firstRunDone: boolean;
 	    queryTimeout: number;
 	    checkUpdates: boolean;
+	    agentWrites: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new Settings(source);
@@ -109,6 +110,7 @@ export namespace config {
 	        this.firstRunDone = source["firstRunDone"];
 	        this.queryTimeout = source["queryTimeout"];
 	        this.checkUpdates = source["checkUpdates"];
+	        this.agentWrites = source["agentWrites"];
 	    }
 	}
 

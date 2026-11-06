@@ -25,10 +25,25 @@ export function connectionMenu(name: string, t: Tree): MenuItem[] {
     { separator: true, label: '' },
     { label: 'New database…', disabled: dialect(name) === 'sqlite', action: () => newDatabase(name) },
     { separator: true, label: '' },
+    ...(manual ? [] : [
+      c?.allowAgentWrites
+        ? { label: 'Make read-only for agents', action: () => setAgentWrites(name, false) }
+        : { label: 'Allow agents to change data…', action: () => setAgentWrites(name, true) },
+      { separator: true, label: '' },
+    ]),
     { label: 'Edit…', disabled: !manual, action: () => editConnection(name) },
     { label: 'Duplicate…', disabled: !manual, action: () => editConnection(name, true) },
     { label: 'Delete', disabled: !manual, danger: true, action: () => deleteConnection(name) },
   ];
+}
+
+/** setAgentWrites switches MCP writes on a lerd connection; saved connections do it in Edit. */
+async function setAgentWrites(name: string, allow: boolean) {
+  if (allow && !(await confirm('Allow agents to change data', `Agents connected over MCP can then run INSERT, UPDATE, DELETE and schema changes on ${displayName(name)}.`, 'Allow', true))) return;
+  await Go.SetAgentWrites(name, allow).catch((e) => showError(e, 'Could not save'));
+  await tree.reload();
+  if (state.selection?.conn === name) emit('select', state.selection);
+  toast(`${displayName(name)}: agents ${allow ? 'can change data' : 'are read-only'}`);
 }
 
 export function databaseMenu(conn: string, dbName: string, t: Tree): MenuItem[] {

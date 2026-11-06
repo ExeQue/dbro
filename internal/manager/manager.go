@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -80,6 +81,11 @@ func (m *Manager) Connections() ([]config.Connection, []string) {
 			warn = append(warn, "lerd: "+err.Error())
 		}
 		out = append(out, lerd...)
+		for i := range out {
+			if out[i].Source == "lerd" || out[i].Source == "lerd-project" {
+				out[i].AllowAgentWrites = slices.Contains(s.AgentWrites, out[i].Name)
+			}
+		}
 	}
 	rank := map[string]int{"manual": 0, "laravel": 0, "lerd-project": 1, "lerd": 2}
 	sort.SliceStable(out, func(i, j int) bool { return rank[out[i].Source] < rank[out[j].Source] })
