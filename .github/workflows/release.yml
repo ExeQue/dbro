@@ -3,6 +3,9 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # a change to this workflow builds and smoke-tests everything before the next tag relies on it
+  pull_request:
+    paths: [.github/workflows/release.yml]
 
 permissions:
   contents: write
@@ -54,7 +57,7 @@ jobs:
           esac
       - name: Package
         run: |
-          name=dbro-${GITHUB_REF_NAME}-${{ matrix.target }}
+          name=dbro-$(git describe --tags --always)-${{ matrix.target }}
           mkdir -p dist
           case "${{ runner.os }}" in
             Linux)
@@ -97,8 +100,43 @@ jobs:
           tar -xzf dbro-*-linux-amd64.tar.gz
           ./dbro-*-linux-amd64/dbro version
 
+  # the archives must unpack and start on the macOS and Windows versions the README promises.
+  # GitHub has no Windows 10 runner; Server 2022 (build 20348) is the closest to it.
+  smoke-desktop:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-15, target: macos-universal } # Apple silicon
+          - { runner: macos-15-intel, target: macos-universal } # the x86_64 half of the universal binary
+          - { runner: windows-2022, target: windows-amd64 }
+          - { runner: windows-2025, target: windows-amd64 }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.target }}
+      - name: Run
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            ditto -x -k dbro-*.zip . && bin=./dbro.app/Contents/MacOS/dbro
+          else
+            7z x -bso0 dbro-*.zip && bin=./dbro.exe
+          fi
+          "$bin" version | tee version.txt
+          grep -q . version.txt
+          # the backend starts and serves the UI without a window
+          "$bin" serve --addr 127.0.0.1:7810 & pid=$!
+          curl -fsS --retry 10 --retry-delay 1 --retry-all-errors http://127.0.0.1:7810/ | grep -q headless.js
+          kill $pid
+
   release:
-    needs: [build, smoke]
+    if: github.event_name == 'push'
+    needs: [build, smoke, smoke-desktop]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/download-artifact@v8
