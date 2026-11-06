@@ -17,7 +17,9 @@
 
 ## Install
 
-Download a build from [Releases](https://github.com/ExeQue/dbro/releases):
+- **Arch Linux** (and Omarchy): `yay -S dbro-bin` from the AUR.
+
+Or download a build from [Releases](https://github.com/ExeQue/dbro/releases):
 
 - **Linux** (amd64, arm64): needs `webkit2gtk-4.1` (already on Omarchy). Unpack, then
   ```sh
@@ -25,8 +27,8 @@ Download a build from [Releases](https://github.com/ExeQue/dbro/releases):
   install -Dm644 dbro.desktop ~/.local/share/applications/dbro.desktop
   install -Dm644 dbro.png ~/.local/share/icons/hicolor/1024x1024/apps/dbro.png
   ```
-- **macOS** (universal): move `dbro.app` to Applications. The build is not notarized, so clear the quarantine flag once: `xattr -dr com.apple.quarantine /Applications/dbro.app`.
-- **Windows** (amd64): run `dbro.exe`. It needs the WebView2 runtime (part of Windows 11). The build is not signed, so SmartScreen asks once.
+- **macOS** (universal): move `dbro.app` to Applications. The build is not notarized, so clear the quarantine flag once: `xattr -dr com.apple.quarantine /Applications/dbro.app`. For the CLI (`dbro mcp`, `dbro serve`), link it onto your PATH: `ln -s /Applications/dbro.app/Contents/MacOS/dbro /usr/local/bin/dbro`.
+- **Windows** (amd64): unpack `dbro.exe` somewhere permanent, e.g. `%LOCALAPPDATA%\Programs\dbro`, and run it. It needs the WebView2 runtime (part of Windows 11). The build is not signed, so SmartScreen asks once (More info, Run anyway). For agents, use the full path: `claude mcp add dbro -- "%LOCALAPPDATA%\Programs\dbro\dbro.exe" mcp`.
 
 lerd and Omarchy integration only apply on Linux; everything else works on all three.
 
@@ -91,3 +93,7 @@ DBRO_TOKEN=secret dbro serve --addr 0.0.0.0:7810
 make dev     # wails dev with hot reload
 make test    # go test ./... (set DBRO_TEST_LERD=1 to also test against lerd's MySQL and PostgreSQL)
 ```
+
+## License
+
+MIT, see [LICENSE](LICENSE).

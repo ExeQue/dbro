@@ -56,7 +56,7 @@ jobs:
           case "${{ runner.os }}" in
             Linux)
               mkdir -p dist/$name
-              cp build/bin/dbro dbro.desktop README.md dist/$name/
+              cp build/bin/dbro dbro.desktop README.md LICENSE dist/$name/
               cp build/appicon.png dist/$name/dbro.png
               tar -C dist -czf dist/$name.tar.gz $name
               file=$name.tar.gz ;;
@@ -64,7 +64,7 @@ jobs:
               ditto -c -k --keepParent build/bin/dbro.app dist/$name.zip
               file=$name.zip ;;
             Windows)
-              7z a dist/$name.zip ./build/bin/dbro.exe README.md
+              7z a dist/$name.zip ./build/bin/dbro.exe README.md LICENSE
               file=$name.zip ;;
           esac
           cd dist && shasum -a 256 $file > $file.sha256
