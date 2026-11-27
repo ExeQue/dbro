@@ -9,7 +9,7 @@
   },
   "devDependencies": {
     "typescript": "^7.0.2",
-    "vite": "^8.3.5"
+    "vite": "^8.3.8"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",
@@ -17,11 +17,11 @@
     "@codemirror/lang-json": "^6.0.2",
     "@codemirror/lang-sql": "^6.10.0",
     "@codemirror/language": "^6.13.1",
-    "@codemirror/lint": "^6.9.7",
+    "@codemirror/lint": "^6.9.8",
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.15",
     "@lezer/highlight": "^1.2.5",
     "codemirror": "^6.0.2",
-    "sql-formatter": "^15.9.0"
+    "sql-formatter": "^15.10.0"
   }
 }
